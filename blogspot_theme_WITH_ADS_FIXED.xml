@@ -808,6 +808,11 @@ h3 { font-size: 1.25rem; }
                     </b:if>
 
                     <div class='post-body'>
+                      <!-- PERMANENT AD VERIFICATION TIMER - Always present in HTML -->
+                      <div id='verification-timer' style='display: none; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 15px 20px; text-align: center; font-family: Arial, sans-serif; font-size: 14px; font-weight: bold; box-shadow: 0 2px 10px rgba(0,0,0,0.2); margin-bottom: 20px; border-radius: 8px; line-height: 1.6;'>
+                        <div id='timer-content'>⏱️ Loading verification timer...</div>
+                      </div>
+                      
                       <h2 class='post-title' itemprop='name headline'>
                         <b:if cond='data:view.isMultipleItems'>
                           <a expr:href='data:post.url' itemprop='url'><data:post.title/></a>
@@ -1130,117 +1135,137 @@ h3 { font-size: 1.25rem; }
     <!-- Adsterra Popunder - ASYNC with error handling -->
     <script async='async' defer='defer' type='text/javascript' src='//pl27986671.effectivegatecpm.com/c0/b0/15/c0b015cd341a99514c7c6e1d5ce12b99.js' onerror="console.error('[Ad] Popunder failed to load')"></script>
 
-    <!-- Ad Verification Timer System - 5 Page Flow with Scroll Detection -->
+    <!-- SOLID, PERMANENT AD VERIFICATION TIMER - Runs immediately -->
     <script type='text/javascript'>
-<![CDATA[
-    (function() {
+//<![CDATA[
+(function() {
+  // Run immediately, no waiting for DOM
+  var verificationPages = [
+    '/2025/11/test-page-1.html',
+    '/2025/11/test-page-2.html',
+    '/2025/11/test-page-3.html',
+    '/2025/11/how-to-set-theme.html',
+    '/2025/11/how-to-download-instagram-reels-using.html'
+  ];
+  
+  var timePerPage = 15; // 15 seconds
+  
+  function initTimer() {
+    try {
       // Get URL parameters
-      const urlParams = new URLSearchParams(window.location.search);
-      const sessionId = urlParams.get('session');
-      const appUrl = urlParams.get('app_url');
+      var urlParams = new URLSearchParams(window.location.search);
+      var sessionId = urlParams.get('session');
+      var appUrl = urlParams.get('app_url');
       
-      // Define the 5 verification pages in order
-      const verificationPages = [
-        '/2025/11/test-page-1.html',
-        '/2025/11/test-pafe-2.html',
-        '/2025/11/test-page-3.html',
-        '/2025/11/how-to-set-theme.html',
-        '/2025/11/how-to-download-instagram-reels-using.html'
-      ];
-      
-      // If session ID exists, start verification process
-      if (sessionId) {
-        const currentPath = window.location.pathname;
-        const currentPageIndex = verificationPages.indexOf(currentPath);
-        
-        // Check if current page is part of verification
-        if (currentPageIndex === -1) {
-          // Not a verification page, redirect to first page
-          window.location.href = verificationPages[0] + '?session=' + sessionId;
-          return;
-        }
-        
-        const currentPageNum = currentPageIndex + 1;
-        const totalPages = verificationPages.length;
-        const timePerPage = 10; // 10 seconds
-        
-        // Find article content
-        const postBody = document.querySelector('.post-body');
-        const postBodyContent = document.querySelector('.post-body-content');
-        
-        if (!postBody) {
-          console.error('Post body not found');
-          return;
-        }
-        
-        // Create timer bar at top of article
-        const timerBar = document.createElement('div');
-        timerBar.id = 'verification-timer';
-        timerBar.style.cssText = 'background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 15px 20px; text-align: center; font-family: Arial, sans-serif; font-size: 14px; font-weight: bold; box-shadow: 0 2px 10px rgba(0,0,0,0.2); margin-bottom: 20px; border-radius: 8px; line-height: 1.6;';
-        
-        // Create next page button container (hidden initially) - will be at end of article
-        const nextButtonContainer = document.createElement('div');
-        nextButtonContainer.id = 'next-page-container';
-        nextButtonContainer.style.cssText = 'display: none; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.15); text-align: center; margin-top: 30px; border: 2px solid #667eea;';
-        
-        let timeRemaining = timePerPage;
-        let timerComplete = false;
-        
-        function updateTimer() {
-          const progress = ((currentPageNum / totalPages) * 100).toFixed(0);
-          
-          if (timeRemaining > 0) {
-            timerBar.innerHTML = '<div>' +
-              '<strong>🎯 Page ' + currentPageNum + ' of ' + totalPages + ' (' + progress + '%)</strong><br/>' +
-              'Please wait: ' + timeRemaining + ' seconds...' +
-              '</div>';
-            timeRemaining--;
-            setTimeout(updateTimer, 1000);
-          } else {
-            timerComplete = true;
-            timerBar.innerHTML = '<div>' +
-              '<strong>✅ Timer Complete!</strong> Scroll down to see the next page button' +
-              '</div>';
-            showNextPageButton();
-          }
-        }
-        
-        function showNextPageButton() {
-          if (currentPageNum < totalPages) {
-            // Show next page button
-            const nextPageUrl = verificationPages[currentPageNum] + '?session=' + sessionId + (appUrl ? '&app_url=' + encodeURIComponent(appUrl) : '');
-            nextButtonContainer.innerHTML = '<h3 style="color: #2196f3; margin-bottom: 10px;">✅ Great Job!</h3>' +
-              '<p style="color: #666; margin-bottom: 15px;">Page ' + currentPageNum + ' of ' + totalPages + ' complete</p>' +
-              '<a href="' + nextPageUrl + '" style="display: inline-block; padding: 15px 40px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-decoration: none; border-radius: 8px; font-size: 16px; font-weight: bold; box-shadow: 0 4px 12px rgba(102,126,234,0.4); transition: all 0.3s ease;">Go to Page ' + (currentPageNum + 1) + ' →</a>';
-            nextButtonContainer.style.display = 'block';
-          } else {
-            // All pages complete, redirect to verification
-            timerBar.innerHTML = '<div>🎉 <strong>ALL PAGES COMPLETE!</strong> Generating your code...</div>';
-            setTimeout(function() {
-              if (appUrl) {
-                // Redirect to bot verification page
-                const verifyUrl = appUrl + '/verify-ad?session=' + sessionId;
-                window.location.href = verifyUrl;
-              } else {
-                // Fallback: Show error if app URL not provided
-                timerBar.innerHTML = '<div style="color: red;">❌ Error: Missing app URL. Please contact support.</div>';
-              }
-            }, 2000);
-          }
-        }
-        
-        // Insert timer at top of article
-        postBody.insertBefore(timerBar, postBody.firstChild);
-        
-        // Insert next button at end of article content (or end of post-body if content not found)
-        const insertTarget = postBodyContent || postBody;
-        insertTarget.appendChild(nextButtonContainer);
-        
-        // Start timer
-        updateTimer();
+      // Only run if session ID exists
+      if (!sessionId) {
+        return;
       }
-    })();
-]]>
+      
+      var currentPath = window.location.pathname;
+      var currentPageIndex = verificationPages.indexOf(currentPath);
+      
+      // Check if current page is part of verification
+      if (currentPageIndex === -1) {
+        window.location.href = verificationPages[0] + '?session=' + sessionId + (appUrl ? '&app_url=' + encodeURIComponent(appUrl) : '');
+        return;
+      }
+      
+      var currentPageNum = currentPageIndex + 1;
+      var totalPages = verificationPages.length;
+      
+      // Get the timer element (already in HTML)
+      var timerBar = document.getElementById('verification-timer');
+      var timerContent = document.getElementById('timer-content');
+      
+      if (!timerBar || !timerContent) {
+        console.error('Timer elements not found');
+        return;
+      }
+      
+      // Show the timer
+      timerBar.style.display = 'block';
+      
+      // Create next page button container
+      var nextButtonContainer = document.createElement('div');
+      nextButtonContainer.id = 'next-page-container';
+      nextButtonContainer.style.cssText = 'display: none; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.15); text-align: center; margin-top: 30px; border: 2px solid #667eea;';
+      
+      var postBody = document.querySelector('.post-body');
+      if (postBody) {
+        postBody.appendChild(nextButtonContainer);
+      }
+      
+      var timeRemaining = timePerPage;
+      
+      function updateTimer() {
+        var progress = ((currentPageNum / totalPages) * 100).toFixed(0);
+        
+        if (timeRemaining > 0) {
+          timerContent.innerHTML = '<strong>🎯 Page ' + currentPageNum + ' of ' + totalPages + ' (' + progress + '%)</strong><br/>Please wait: ' + timeRemaining + ' seconds...';
+          timeRemaining--;
+          setTimeout(updateTimer, 1000);
+        } else {
+          timerContent.innerHTML = '<strong>✅ Timer Complete!</strong> Scroll down to see the next page button';
+          showNextPageButton();
+        }
+      }
+      
+      function showNextPageButton() {
+        if (currentPageNum < totalPages) {
+          var nextPageUrl = verificationPages[currentPageNum] + '?session=' + sessionId + (appUrl ? '&app_url=' + encodeURIComponent(appUrl) : '');
+          nextButtonContainer.innerHTML = '<h3 style="color: #2196f3; margin-bottom: 10px;">✅ Great Job!</h3>' +
+            '<p style="color: #666; margin-bottom: 15px;">Page ' + currentPageNum + ' of ' + totalPages + ' complete</p>' +
+            '<a href="' + nextPageUrl + '" onclick="return handleNextPageClick(event, this.href);" style="display: inline-block; padding: 15px 40px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-decoration: none; border-radius: 8px; font-size: 16px; font-weight: bold; box-shadow: 0 4px 12px rgba(102,126,234,0.4); transition: all 0.3s ease;">Go to Page ' + (currentPageNum + 1) + ' →</a>';
+          nextButtonContainer.style.display = 'block';
+        } else {
+          timerContent.innerHTML = '🎉 <strong>ALL PAGES COMPLETE!</strong> Generating your code...';
+          setTimeout(function() {
+            if (appUrl) {
+              window.location.href = appUrl + '/verify-ad?session=' + sessionId;
+            } else {
+              timerContent.innerHTML = '❌ Error: Missing app URL. Please contact support.';
+            }
+          }, 2000);
+        }
+      }
+      
+      // Popunder handler for next page button
+      var popunderOpened = false;
+      function handleNextPageClick(event, url) {
+        if (!popunderOpened) {
+          event.preventDefault();
+          popunderOpened = true;
+          
+          // Open popunder ad
+          var popunder = window.open('https://www.effectivegatecpm.com/zn01rc1vt?key=78d0724d73f6154a582464c95c28210d', '_blank');
+          
+          // Navigate to next page after short delay
+          setTimeout(function() {
+            window.location.href = url;
+          }, 300);
+          
+          return false;
+        }
+        return true;
+      }
+      
+      // Start timer immediately
+      updateTimer();
+      
+    } catch(e) {
+      console.error('Timer init error:', e);
+    }
+  }
+  
+  // Run immediately
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initTimer);
+  } else {
+    initTimer();
+  }
+})();
+//]]>
     </script>
     
     <!-- Adsterra SmartBar (Sticky notification bar) - FIXED -->

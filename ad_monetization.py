@@ -88,15 +88,21 @@ class AdMonetization:
     
     def generate_ad_link(self, user_id: int, bot_domain: str | None = None) -> tuple[str, str]:
         """
-        Generate ad link - sends user to blog where they navigate pages 1-5 for verification
-        All ads are on the website, not in the bot
+        Generate ad link - sends user to blog homepage with session
+        Blog's JavaScript will automatically redirect to first verification page
+        This way you can change verification pages in theme without updating bot code
         """
         session_id = self.create_ad_session(user_id)
         
-        # First verification page URL
-        first_page_url = f"{self.blog_url}2025/11/test-page-1.html?session={session_id}"
+        # Send to blog homepage - theme will handle redirect to first page
+        first_page_url = f"{self.blog_url}?session={session_id}"
         
-        LOGGER(__name__).info(f"User {user_id}: Sending to blog for ad verification (navigate pages 1-5)")
+        # Add app_url parameter if bot domain is available
+        if bot_domain:
+            from urllib.parse import quote
+            first_page_url += f"&app_url={quote(bot_domain)}"
+        
+        LOGGER(__name__).info(f"User {user_id}: Sending to blog homepage for ad verification - app_url: {bot_domain}")
         
         return session_id, first_page_url
     
