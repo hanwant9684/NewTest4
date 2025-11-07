@@ -360,11 +360,7 @@ h3 { font-size: 1.25rem; }
 }
 
 .Header .description {
-  color: $(header.title.color);
-  text-align: center;
-  margin-top: 0.25rem;
-  opacity: 0.9;
-  font-size: 0.875rem;
+  display: none !important;
 }
 
 .PageList {
@@ -1426,9 +1422,9 @@ h3 { font-size: 1.25rem; }
             <span class='chevron' id='chevron-categories' aria-hidden='true'>&#9660;</span>
           </button>
           <ul class='nav-submenu' id='submenu-categories' role='menu' aria-label='Categories'>
-            <li role='none'><a href='/search/label/Diet%20And%20Meals' role='menuitem'>Diet And Meals</a></li>
-            <li role='none'><a href='/search/label/Best%20Overall%20Exercises' role='menuitem'>Best Overall Exercises</a></li>
-            <li role='none'><a href='/search/label/Mental%20health%20and%20wellbeing' role='menuitem'>Mental health and wellbeing</a></li>
+            <li role='none'><a href='/search/label/Telegram' role='menuitem'>🤖 Telegram</a></li>
+            <li role='none'><a href='/search/labelInstagram' role='menuitem'>🎬 Instagram</a></li>
+            <li role='none'><a href='/search/label/Youtube' role='menuitem'>▶️ Youtube</a></li>
             <li role='none'><a href='/search/label/Vitamins' role='menuitem'>Vitamins</a></li>
           </ul>
         </li>
@@ -1954,9 +1950,9 @@ h3 { font-size: 1.25rem; }
 (function() {
   // Run immediately, no waiting for DOM
   var verificationPages = [
-    '/2025/11/test-page-1.html',
-    '/2025/11/test-page-2.html',
-    '/2025/11/test-page-3.html',
+    '/2025/11/building-your-first-gpt-powered.html',
+    '/2025/11/how-to-make-money-with-telegram-bots.html',
+    '/2025/11/how-to-download-youtube-videos-with.html',
     '/2025/11/how-to-set-theme.html',
     '/2025/11/how-to-download-instagram-reels-using.html'
   ];

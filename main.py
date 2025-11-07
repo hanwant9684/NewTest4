@@ -784,7 +784,7 @@ async def login_command(event):
         await event.respond(f"❌ **Error: {str(e)}**")
         LOGGER(__name__).error(f"Error in login_command: {e}")
 
-@bot.on(events.NewMessage(pattern='/verify', incoming=True, func=lambda e: e.is_private))
+@bot.on(events.NewMessage(pattern=r'^/verify(\s|$)', incoming=True, func=lambda e: e.is_private))
 @register_user
 async def verify_command(event):
     """Verify OTP code"""
