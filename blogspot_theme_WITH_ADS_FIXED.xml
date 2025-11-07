@@ -45,11 +45,144 @@
       <meta content='summary_large_image' name='twitter:card'/>
       <meta expr:content='data:post.author' name='author'/>
       <link expr:href='data:post.url.canonical' rel='canonical'/>
+      <b:if cond='data:post.snippet'>
+        <meta expr:content='data:post.snippet' name='description'/>
+      </b:if>
     <b:else/>
       <meta expr:content='data:blog.title' property='og:title'/>
       <meta expr:content='data:blog.homepageUrl' property='og:url'/>
       <meta content='website' property='og:type'/>
+      <b:if cond='data:blog.metaDescription'>
+        <meta expr:content='data:blog.metaDescription' name='description'/>
+      <b:else/>
+        <meta expr:content='data:blog.title + &quot; - Your source for health, fitness, and wellness information&quot;' name='description'/>
+      </b:if>
     </b:if>
+    
+    <!-- JSON-LD Structured Data for SEO - Using JavaScript for proper escaping -->
+    <b:if cond='data:view.isPost'>
+      <script type='text/javascript'>
+      //<![CDATA[
+      (function() {
+        var blogPosting = {
+          "@context": "https://schema.org",
+          "@type": "BlogPosting",
+          "headline": "<data:post.title.jsonEscaped/>",
+          "url": "<data:post.url.jsonEscaped/>",
+          "datePublished": "<data:post.dateIso8601/>",
+          "dateModified": "<data:post.lastUpdatedIso8601/>",
+          "author": {
+            "@type": "Person",
+            "name": "<data:post.author.jsonEscaped/>"
+          },
+          "publisher": {
+            "@type": "Organization",
+            "name": "<data:blog.title.jsonEscaped/>",
+            "logo": {
+              "@type": "ImageObject",
+              "url": "https://socialhub00.blogspot.com/favicon.ico"
+            }
+          },
+          <b:if cond='data:post.featuredImage'>
+          "image": "<data:post.featuredImage.jsonEscaped/>",
+          </b:if>
+          "description": "<data:post.snippet.jsonEscaped/>"
+        };
+        
+        var script = document.createElement('script');
+        script.type = 'application/ld+json';
+        script.text = JSON.stringify(blogPosting);
+        document.head.appendChild(script);
+      })();
+      //]]>
+      </script>
+      
+      <!-- BreadcrumbList Schema for SEO -->
+      <script type='text/javascript'>
+      //<![CDATA[
+      (function() {
+        var breadcrumb = {
+          "@context": "https://schema.org",
+          "@type": "BreadcrumbList",
+          "itemListElement": [
+            {
+              "@type": "ListItem",
+              "position": 1,
+              "name": "Home",
+              "item": "<data:blog.homepageUrl/>"
+            }
+            <b:if cond='data:post.labels'>
+            <b:loop values='data:post.labels limit 1' var='label'>
+            ,{
+              "@type": "ListItem",
+              "position": 2,
+              "name": "<data:label.name.jsonEscaped/>",
+              "item": "<data:label.url.jsonEscaped/>"
+            }
+            </b:loop>
+            </b:if>
+            ,{
+              "@type": "ListItem",
+              "position": <b:if cond='data:post.labels'>3<b:else/>2</b:if>,
+              "name": "<data:post.title.jsonEscaped/>",
+              "item": "<data:post.url.jsonEscaped/>"
+            }
+          ]
+        };
+        
+        var script = document.createElement('script');
+        script.type = 'application/ld+json';
+        script.text = JSON.stringify(breadcrumb);
+        document.head.appendChild(script);
+      })();
+      //]]>
+      </script>
+    </b:if>
+    
+    <!-- Organization Schema -->
+    <script type='text/javascript'>
+    //<![CDATA[
+    (function() {
+      var organization = {
+        "@context": "https://schema.org",
+        "@type": "Organization",
+        "name": "<data:blog.title.jsonEscaped/>",
+        "url": "<data:blog.homepageUrl/>",
+        "logo": "https://socialhub00.blogspot.com/favicon.ico",
+        "sameAs": []
+      };
+      
+      var script = document.createElement('script');
+      script.type = 'application/ld+json';
+      script.text = JSON.stringify(organization);
+      document.head.appendChild(script);
+    })();
+    //]]>
+    </script>
+    
+    <!-- WebSite Schema with Search -->
+    <script type='text/javascript'>
+    //<![CDATA[
+    (function() {
+      var website = {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "name": "<data:blog.title.jsonEscaped/>",
+        "url": "<data:blog.homepageUrl/>",
+        "potentialAction": {
+          "@type": "SearchAction",
+          "target": "<data:blog.homepageUrl/>search?q={search_term_string}",
+          "query-input": "required name=search_term_string"
+        }
+      };
+      
+      var script = document.createElement('script');
+      script.type = 'application/ld+json';
+      script.text = JSON.stringify(website);
+      document.head.appendChild(script);
+    })();
+    //]]>
+    </script>
 
     <b:skin version='1.3.3'><![CDATA[
 /*
@@ -639,6 +772,476 @@ h3 { font-size: 1.25rem; }
   top: 0;
 }
 
+.hamburger-menu {
+  position: absolute;
+  left: 15px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 8px;
+  z-index: 1001;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.hamburger-menu span {
+  display: block;
+  width: 28px;
+  height: 3px;
+  background: white;
+  border-radius: 2px;
+  transition: all 0.3s ease;
+}
+
+.hamburger-menu:hover span {
+  background: rgba(255,255,255,0.8);
+}
+
+.header-search {
+  position: absolute;
+  right: 15px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 1001;
+}
+
+.header-search form {
+  display: flex;
+  align-items: center;
+  background: rgba(255,255,255,0.2);
+  border-radius: 20px;
+  padding: 6px 12px;
+  transition: all 0.3s ease;
+}
+
+.header-search form:hover,
+.header-search form:focus-within {
+  background: rgba(255,255,255,0.3);
+}
+
+.header-search input[type="text"] {
+  background: transparent;
+  border: none;
+  outline: none;
+  color: white;
+  padding: 4px 8px;
+  width: 180px;
+  font-size: 0.875rem;
+}
+
+.header-search input[type="text"]::placeholder {
+  color: rgba(255,255,255,0.7);
+}
+
+.header-search button {
+  background: none;
+  border: none;
+  color: white;
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+}
+
+@media (max-width: 480px) {
+  .header-search input[type="text"] {
+    width: 100px;
+    font-size: 0.8125rem;
+  }
+  
+  .header-search form {
+    padding: 4px 8px;
+  }
+  
+  .hamburger-menu {
+    left: 10px;
+  }
+  
+  .header-search {
+    right: 10px;
+  }
+}
+
+@media (max-width: 360px) {
+  .header-search input[type="text"] {
+    width: 80px;
+  }
+  
+  .Header h1 {
+    font-size: 1.25rem !important;
+    padding: 0 60px;
+  }
+}
+
+.nav-drawer {
+  position: fixed;
+  top: 0;
+  left: -100%;
+  width: 85%;
+  max-width: 320px;
+  height: 100vh;
+  background: white;
+  box-shadow: 2px 0 20px rgba(0,0,0,0.2);
+  transition: left 0.3s ease;
+  z-index: 2000;
+  overflow-y: auto;
+  padding-bottom: 80px;
+}
+
+.nav-drawer.open {
+  left: 0;
+}
+
+@media (min-width: 480px) {
+  .nav-drawer {
+    width: 320px;
+  }
+}
+
+.nav-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100vh;
+  background: rgba(0,0,0,0.5);
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.3s ease;
+  z-index: 1999;
+}
+
+.nav-overlay.show {
+  opacity: 1;
+  visibility: visible;
+}
+
+.nav-drawer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.nav-drawer-header h3 {
+  margin: 0;
+  font-size: 1.125rem;
+  color: #1f2937;
+}
+
+.nav-close {
+  background: none;
+  border: none;
+  font-size: 28px;
+  cursor: pointer;
+  color: #6b7280;
+  padding: 0;
+  line-height: 1;
+}
+
+.nav-menu {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.nav-menu > li {
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.nav-menu > li > a,
+.nav-menu > li > button {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 15px 20px;
+  color: #1f2937;
+  text-decoration: none;
+  font-size: 0.95rem;
+  background: none;
+  border: none;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.nav-menu > li > a:hover,
+.nav-menu > li > button:hover {
+  background: #f3f4f6;
+}
+
+.nav-menu .icon {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.nav-submenu {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease;
+  background: #f9fafb;
+}
+
+.nav-submenu.open {
+  max-height: 500px;
+}
+
+.nav-submenu li {
+  padding-left: 52px;
+}
+
+.nav-submenu li a {
+  display: block;
+  padding: 12px 20px;
+  color: #6b7280;
+  text-decoration: none;
+  font-size: 0.9rem;
+  transition: all 0.2s ease;
+}
+
+.nav-submenu li a:hover {
+  color: $(body.link.color);
+  background: white;
+}
+
+.chevron {
+  margin-left: auto;
+  transition: transform 0.3s ease;
+}
+
+.chevron.rotate {
+  transform: rotate(180deg);
+}
+
+.nav-footer-links {
+  padding: 20px;
+  border-top: 2px solid #e5e7eb;
+  margin-top: 20px;
+}
+
+.nav-footer-links h4 {
+  font-size: 0.75rem;
+  color: #9ca3af;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 10px;
+}
+
+.nav-footer-links a {
+  display: block;
+  padding: 8px 0;
+  color: #6b7280;
+  text-decoration: none;
+  font-size: 0.875rem;
+}
+
+.nav-footer-links a:hover {
+  color: $(body.link.color);
+}
+
+.footer-support-section {
+  margin: 1.5rem 0;
+  padding: 1.5rem 0;
+  border-top: 1px solid rgba(255,255,255,0.1);
+}
+
+.footer-support-section h3 {
+  color: white;
+  font-size: 1.125rem;
+  margin-bottom: 1rem;
+  text-align: center;
+}
+
+.footer-support-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 1rem;
+  margin-top: 0.75rem;
+}
+
+.footer-support-links a {
+  color: rgba(255,255,255,0.9);
+  text-decoration: none;
+  font-size: 0.875rem;
+  padding: 0.5rem 0;
+  transition: color 0.3s ease;
+}
+
+.footer-support-links a:hover {
+  color: white;
+}
+
+@media (max-width: 480px) {
+  .footer-support-links {
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+  }
+}
+
+.cookie-consent {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #1f2937;
+  color: white;
+  padding: 1.25rem;
+  box-shadow: 0 -4px 20px rgba(0,0,0,0.3);
+  z-index: 9999;
+  display: none;
+  animation: slideUp 0.4s ease-out;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+.cookie-consent.show {
+  display: block;
+}
+
+.cookie-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.cookie-text {
+  flex: 1;
+  min-width: 250px;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.cookie-text a {
+  color: #60a5fa;
+  text-decoration: underline;
+}
+
+.cookie-buttons {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.cookie-btn {
+  padding: 0.625rem 1.5rem;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.cookie-accept {
+  background: #2196f3;
+  color: white;
+}
+
+.cookie-accept:hover {
+  background: #1976d2;
+}
+
+.cookie-decline {
+  background: #6b7280;
+  color: white;
+}
+
+.cookie-decline:hover {
+  background: #4b5563;
+}
+
+.breadcrumb {
+  padding: 0.75rem 0;
+  font-size: 0.875rem;
+  color: #6b7280;
+  margin-bottom: 1rem;
+}
+
+.breadcrumb a {
+  color: #6b7280;
+  text-decoration: none;
+  transition: color 0.3s ease;
+}
+
+.breadcrumb a:hover {
+  color: $(body.link.color);
+}
+
+.breadcrumb span {
+  margin: 0 0.5rem;
+}
+
+.social-share {
+  display: flex;
+  gap: 0.75rem;
+  margin: 1.5rem 0;
+  padding: 1rem 0;
+  border-top: 1px solid #e5e7eb;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.social-share-title {
+  font-weight: 600;
+  color: #1f2937;
+  margin-right: 0.5rem;
+  display: flex;
+  align-items: center;
+}
+
+.social-share a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  color: white;
+  text-decoration: none;
+  transition: all 0.3s ease;
+  font-size: 18px;
+}
+
+.social-share a:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+
+.share-facebook { background: #1877f2; }
+.share-twitter { background: #1da1f2; }
+.share-linkedin { background: #0a66c2; }
+.share-whatsapp { background: #25d366; }
+.share-telegram { background: #0088cc; }
+
+@media (max-width: 480px) {
+  .social-share {
+    flex-wrap: wrap;
+  }
+}
+
 .ad-zone {
   margin: 1rem 0;
   padding: 0;
@@ -712,11 +1315,92 @@ h3 { font-size: 1.25rem; }
   <body>
     <a class='skip-link' href='#main'>Skip to content</a>
 
+    <!-- Cookie Consent Banner -->
+    <div class='cookie-consent' id='cookieConsent'>
+      <div class='cookie-content'>
+        <div class='cookie-text'>
+          We use cookies to enhance your browsing experience and analyze site traffic. By continuing to use this site, you consent to our use of cookies. 
+          <a href='https://socialhub00.blogspot.com/p/privacy-policy.html'>Learn more</a>
+        </div>
+        <div class='cookie-buttons'>
+          <button class='cookie-btn cookie-accept' onclick='acceptCookies()'>Accept</button>
+          <button class='cookie-btn cookie-decline' onclick='declineCookies()'>Decline</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Adsterra Social Bar (Mobile-friendly notification bar) - ASYNC -->
     <script async='async' type='text/javascript' src='//pl27986712.effectivegatecpm.com/2b/df/1e/2bdf1ed6ce287741683400fd27494234.js'></script>
 
+    <!-- Navigation Drawer -->
+    <div class='nav-overlay' id='navOverlay' onclick='closeNav()' role='presentation'></div>
+    <nav class='nav-drawer' id='navDrawer' role='navigation' aria-label='Main navigation'>
+      <div class='nav-drawer-header'>
+        <h3>Menu</h3>
+        <button class='nav-close' onclick='closeNav()' aria-label='Close navigation menu'>&#215;</button>
+      </div>
+      <ul class='nav-menu' role='menubar'>
+        <li role='none'>
+          <a href='/' role='menuitem'>
+            <span class='icon' aria-hidden='true'>&#127968;</span>
+            <span>Home</span>
+          </a>
+        </li>
+        <li role='none'>
+          <button onclick='toggleSubmenu("categories")' aria-expanded='false' aria-controls='submenu-categories' role='menuitem'>
+            <span class='icon' aria-hidden='true'>&#128193;</span>
+            <span>Categories</span>
+            <span class='chevron' id='chevron-categories' aria-hidden='true'>&#9660;</span>
+          </button>
+          <ul class='nav-submenu' id='submenu-categories' role='menu' aria-label='Categories'>
+            <li role='none'><a href='/search/label/Diet%20And%20Meals' role='menuitem'>Diet And Meals</a></li>
+            <li role='none'><a href='/search/label/Best%20Overall%20Exercises' role='menuitem'>Best Overall Exercises</a></li>
+            <li role='none'><a href='/search/label/Mental%20health%20and%20wellbeing' role='menuitem'>Mental health and wellbeing</a></li>
+            <li role='none'><a href='/search/label/Vitamins' role='menuitem'>Vitamins</a></li>
+          </ul>
+        </li>
+        <li role='none'>
+          <a href='https://socialhub00.blogspot.com/p/about-us.html' role='menuitem'>
+            <span class='icon' aria-hidden='true'>&#128100;</span>
+            <span>About</span>
+          </a>
+        </li>
+        <li role='none'>
+          <a href='https://socialhub00.blogspot.com/p/contact-us.html' role='menuitem'>
+            <span class='icon' aria-hidden='true'>&#9993;</span>
+            <span>Contact</span>
+          </a>
+        </li>
+      </ul>
+      <div class='nav-footer-links'>
+        <h4>More...</h4>
+        <a href='https://socialhub00.blogspot.com/p/terms-conditions.html'>Terms&amp;Conditions</a>
+        <a href='https://socialhub00.blogspot.com/p/privacy-policy.html'>Privacy Policy</a>
+      </div>
+    </nav>
+
     <div class='header-wrapper' itemscope='itemscope' itemtype='http://schema.org/WPHeader' role='banner'>
       <div class='container'>
+        <!-- Hamburger Menu Button -->
+        <button class='hamburger-menu' onclick='openNav()' aria-label='Open menu'>
+          <span></span>
+          <span></span>
+          <span></span>
+        </button>
+        
+        <!-- Search Box -->
+        <div class='header-search'>
+          <form action='/search' method='get'>
+            <input type='text' name='q' placeholder='Search...' aria-label='Search'/>
+            <button type='submit' aria-label='Submit search'>
+              <svg width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'>
+                <circle cx='11' cy='11' r='8'></circle>
+                <path d='m21 21-4.35-4.35'></path>
+              </svg>
+            </button>
+          </form>
+        </div>
+        
         <b:section class='header' id='header' maxwidgets='1' showaddelement='no'>
           <b:widget id='Header1' locked='true' title='Blog Title' type='Header' version='2' visible='true'>
             <b:includable id='main'>
@@ -805,6 +1489,21 @@ h3 { font-size: 1.25rem; }
                     </b:if>
 
                     <div class='post-body'>
+                      <!-- Breadcrumb Navigation for Single Post View -->
+                      <b:if cond='data:view.isPost'>
+                        <nav class='breadcrumb' aria-label='Breadcrumb'>
+                          <a href='/' rel='home'>Home</a>
+                          <span aria-hidden='true'>&gt;</span>
+                          <b:if cond='data:post.labels'>
+                            <b:loop values='data:post.labels limit 1' var='label'>
+                              <a expr:href='data:label.url'><data:label.name/></a>
+                              <span aria-hidden='true'>&gt;</span>
+                            </b:loop>
+                          </b:if>
+                          <span aria-current='page'><data:post.title/></span>
+                        </nav>
+                      </b:if>
+                      
                       <!-- PERMANENT AD VERIFICATION TIMER - Always present in HTML -->
                       <div id='verification-timer' style='display: none; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 15px 20px; text-align: center; font-family: Arial, sans-serif; font-size: 14px; font-weight: bold; box-shadow: 0 2px 10px rgba(0,0,0,0.2); margin-bottom: 20px; border-radius: 8px; line-height: 1.6;'>
                         <div id='timer-content'>⏱️ Loading verification timer...</div>
@@ -836,6 +1535,28 @@ h3 { font-size: 1.25rem; }
                           <div class='post-snippet'><data:post.snippet/></div>
                         <b:else/>
                           <div class='post-body-content' itemprop='articleBody' id='article-content'><data:post.body/></div>
+                          
+                          <!-- Social Sharing Buttons for Posts -->
+                          <b:if cond='data:view.isPost'>
+                            <div class='social-share' role='complementary' aria-label='Share this article'>
+                              <span class='social-share-title'>Share:</span>
+                              <a expr:href='&quot;https://www.facebook.com/sharer/sharer.php?u=&quot; + data:post.url' target='_blank' rel='noopener noreferrer' class='share-facebook' aria-label='Share on Facebook' title='Share on Facebook'>
+                                <span aria-hidden='true'>f</span>
+                              </a>
+                              <a expr:href='&quot;https://twitter.com/intent/tweet?url=&quot; + data:post.url + &quot;&amp;text=&quot; + data:post.title' target='_blank' rel='noopener noreferrer' class='share-twitter' aria-label='Share on Twitter' title='Share on Twitter'>
+                                <span aria-hidden='true'>𝕏</span>
+                              </a>
+                              <a expr:href='&quot;https://www.linkedin.com/shareArticle?mini=true&amp;url=&quot; + data:post.url' target='_blank' rel='noopener noreferrer' class='share-linkedin' aria-label='Share on LinkedIn' title='Share on LinkedIn'>
+                                <span aria-hidden='true'>in</span>
+                              </a>
+                              <a expr:href='&quot;https://wa.me/?text=&quot; + data:post.title + &quot; &quot; + data:post.url' target='_blank' rel='noopener noreferrer' class='share-whatsapp' aria-label='Share on WhatsApp' title='Share on WhatsApp'>
+                                <span aria-hidden='true'>&#9990;</span>
+                              </a>
+                              <a expr:href='&quot;https://t.me/share/url?url=&quot; + data:post.url + &quot;&amp;text=&quot; + data:post.title' target='_blank' rel='noopener noreferrer' class='share-telegram' aria-label='Share on Telegram' title='Share on Telegram'>
+                                <span aria-hidden='true'>&#9992;</span>
+                              </a>
+                            </div>
+                          </b:if>
                           
                           <!-- JavaScript to inject OnClickA horizontal banner ad in middle of article - IMPROVED -->
                           <script type='text/javascript'>
@@ -1122,6 +1843,20 @@ h3 { font-size: 1.25rem; }
           </div>
         </div>
         
+        <!-- Support Section in Footer -->
+        <div class='footer-support-section'>
+          <h3>Support</h3>
+          <div class='footer-support-links'>
+            <a href='https://socialhub00.blogspot.com/p/contact-us.html'>Contact</a>
+            <span style='color: rgba(255,255,255,0.5);'>|</span>
+            <a href='https://socialhub00.blogspot.com/p/privacy-policy.html'>Privacy-Policy</a>
+            <span style='color: rgba(255,255,255,0.5);'>|</span>
+            <a href='https://socialhub00.blogspot.com/p/terms-conditions.html'>Terms&amp;Conditions</a>
+            <span style='color: rgba(255,255,255,0.5);'>|</span>
+            <a href='https://socialhub00.blogspot.com/sitemap.xml'>Sitemap</a>
+          </div>
+        </div>
+        
         <div class='footer'>
           <p>&#169; <script>document.write(new Date().getFullYear())</script> <data:blog.title/>. All rights reserved.</p>
           <p>Powered by <a href='https://www.blogger.com' rel='nofollow'>Blogger</a></p>
@@ -1295,6 +2030,112 @@ h3 { font-size: 1.25rem; }
 })();
 ]]>
 </script>
+
+    <!-- Navigation Menu Controls with Keyboard Support -->
+    <script>
+//<![CDATA[
+var focusableElements = [];
+var firstFocusableElement = null;
+var lastFocusableElement = null;
+
+function openNav() {
+  var navDrawer = document.getElementById('navDrawer');
+  var navOverlay = document.getElementById('navOverlay');
+  
+  navDrawer.classList.add('open');
+  navOverlay.classList.add('show');
+  document.body.style.overflow = 'hidden';
+  
+  // Get all focusable elements in nav drawer
+  focusableElements = navDrawer.querySelectorAll('a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])');
+  if (focusableElements.length > 0) {
+    firstFocusableElement = focusableElements[0];
+    lastFocusableElement = focusableElements[focusableElements.length - 1];
+    
+    // Focus first element
+    setTimeout(function() {
+      firstFocusableElement.focus();
+    }, 100);
+  }
+}
+
+function closeNav() {
+  var navDrawer = document.getElementById('navDrawer');
+  var navOverlay = document.getElementById('navOverlay');
+  
+  navDrawer.classList.remove('open');
+  navOverlay.classList.remove('show');
+  document.body.style.overflow = '';
+}
+
+function toggleSubmenu(menuId) {
+  var submenu = document.getElementById('submenu-' + menuId);
+  var chevron = document.getElementById('chevron-' + menuId);
+  var button = document.querySelector('[aria-controls="submenu-' + menuId + '"]');
+  
+  if (submenu.classList.contains('open')) {
+    submenu.classList.remove('open');
+    chevron.classList.remove('rotate');
+    if (button) button.setAttribute('aria-expanded', 'false');
+  } else {
+    submenu.classList.add('open');
+    chevron.classList.add('rotate');
+    if (button) button.setAttribute('aria-expanded', 'true');
+  }
+}
+
+// Keyboard navigation with focus trapping
+document.addEventListener('keydown', function(e) {
+  var navDrawer = document.getElementById('navDrawer');
+  var isOpen = navDrawer.classList.contains('open');
+  
+  // Close on Escape
+  if (e.key === 'Escape' && isOpen) {
+    closeNav();
+    return;
+  }
+  
+  // Focus trapping
+  if (isOpen && e.key === 'Tab') {
+    if (e.shiftKey) { // Shift + Tab
+      if (document.activeElement === firstFocusableElement) {
+        e.preventDefault();
+        lastFocusableElement.focus();
+      }
+    } else { // Tab
+      if (document.activeElement === lastFocusableElement) {
+        e.preventDefault();
+        firstFocusableElement.focus();
+      }
+    }
+  }
+});
+
+// Cookie Consent Functions
+function acceptCookies() {
+  localStorage.setItem('cookieConsent', 'accepted');
+  document.getElementById('cookieConsent').classList.remove('show');
+  // Load analytics/ads if needed
+  console.log('Cookies accepted');
+}
+
+function declineCookies() {
+  localStorage.setItem('cookieConsent', 'declined');
+  document.getElementById('cookieConsent').classList.remove('show');
+  console.log('Cookies declined');
+}
+
+// Show cookie banner if not answered
+window.addEventListener('load', function() {
+  var consent = localStorage.getItem('cookieConsent');
+  if (!consent) {
+    setTimeout(function() {
+      document.getElementById('cookieConsent').classList.add('show');
+    }, 1000);
+  }
+});
+//]]>
+    </script>
 
     <b:include data='blog' name='google-analytics'/>
   </body>
