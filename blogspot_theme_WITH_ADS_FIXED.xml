@@ -5,6 +5,24 @@
     <meta content='width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes' name='viewport'/>
     <meta content='IE=edge' http-equiv='X-UA-Compatible'/>
     
+    <!-- Fix Blogger Mobile Redirect for Better Google Indexing -->
+    <script type='text/javascript'>
+    //<![CDATA[
+    // Remove ?m=1 parameter from URL to fix Google Search Console redirect errors
+    (function() {
+      var url = window.location.href;
+      if (url.indexOf('?m=1') !== -1 || url.indexOf('&m=1') !== -1) {
+        // Clean URL by removing mobile parameter
+        var cleanUrl = url.replace(/[\?&]m=1/g, '');
+        // Update browser URL without page reload
+        if (window.history && window.history.replaceState) {
+          window.history.replaceState(null, null, cleanUrl);
+        }
+      }
+    })();
+    //]]>
+    </script>
+    
     <b:if cond='data:view.isHomepage'>
       <title><data:blog.pageTitle/></title>
     <b:else/>
@@ -322,8 +340,8 @@ h3 { font-size: 1.25rem; }
   color: #ffffff;
   margin: 0;
   text-align: center;
-  font-size: 1.75rem;
-  padding: 0;
+  font-size: 1.5rem;
+  padding: 0 60px;
   text-shadow: 0 2px 10px rgba(0,0,0,0.2);
   letter-spacing: 1px;
 }
@@ -331,7 +349,14 @@ h3 { font-size: 1.25rem; }
 @media (min-width: 768px) {
   .Header h1 {
     font-size: 2.5rem;
+    padding: 0 80px;
   }
+}
+
+.Header h1 a {
+  color: inherit;
+  text-decoration: none;
+  display: inline-block;
 }
 
 .Header .description {
@@ -808,54 +833,103 @@ h3 { font-size: 1.25rem; }
   z-index: 1001;
 }
 
-.header-search form {
-  display: flex;
-  align-items: center;
-  background: rgba(255,255,255,0.2);
-  border-radius: 20px;
-  padding: 6px 12px;
-  transition: all 0.3s ease;
-}
-
-.header-search form:hover,
-.header-search form:focus-within {
-  background: rgba(255,255,255,0.3);
-}
-
-.header-search input[type="text"] {
-  background: transparent;
-  border: none;
-  outline: none;
-  color: white;
-  padding: 4px 8px;
-  width: 180px;
-  font-size: 0.875rem;
-}
-
-.header-search input[type="text"]::placeholder {
-  color: rgba(255,255,255,0.7);
-}
-
-.header-search button {
+.search-icon-btn {
   background: none;
   border: none;
   color: white;
   cursor: pointer;
-  padding: 4px;
+  padding: 8px;
   display: flex;
   align-items: center;
+  transition: all 0.3s ease;
+}
+
+.search-icon-btn:hover {
+  background: rgba(255,255,255,0.2);
+  border-radius: 50%;
+}
+
+.search-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.8);
+  z-index: 3000;
+  display: none;
+  align-items: flex-start;
+  padding-top: 80px;
+  justify-content: center;
+}
+
+.search-overlay.active {
+  display: flex;
+}
+
+.search-box-container {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  width: 90%;
+  max-width: 600px;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+  position: relative;
+}
+
+.search-box-container form {
+  display: flex;
+  gap: 10px;
+}
+
+.search-box-container input[type="text"] {
+  flex: 1;
+  padding: 12px 16px;
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 1rem;
+  outline: none;
+  transition: border-color 0.3s ease;
+}
+
+.search-box-container input[type="text"]:focus {
+  border-color: #667eea;
+}
+
+.search-box-container button[type="submit"] {
+  padding: 12px 24px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.search-box-container button[type="submit"]:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(102,126,234,0.4);
+}
+
+.search-close-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: none;
+  border: none;
+  font-size: 24px;
+  color: #666;
+  cursor: pointer;
+  padding: 5px 10px;
+  line-height: 1;
+}
+
+.search-close-btn:hover {
+  color: #333;
 }
 
 @media (max-width: 480px) {
-  .header-search input[type="text"] {
-    width: 100px;
-    font-size: 0.8125rem;
-  }
-  
-  .header-search form {
-    padding: 4px 8px;
-  }
-  
   .hamburger-menu {
     left: 10px;
   }
@@ -863,16 +937,15 @@ h3 { font-size: 1.25rem; }
   .header-search {
     right: 10px;
   }
+  
+  .Header h1 {
+    font-size: 1.4rem;
+  }
 }
 
 @media (max-width: 360px) {
-  .header-search input[type="text"] {
-    width: 80px;
-  }
-  
   .Header h1 {
-    font-size: 1.25rem !important;
-    padding: 0 60px;
+    font-size: 1.2rem !important;
   }
 }
 
@@ -1388,17 +1461,25 @@ h3 { font-size: 1.25rem; }
           <span></span>
         </button>
         
-        <!-- Search Box -->
+        <!-- Search Icon Button -->
         <div class='header-search'>
-          <form action='/search' method='get'>
-            <input type='text' name='q' placeholder='Search...' aria-label='Search'/>
-            <button type='submit' aria-label='Submit search'>
-              <svg width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'>
-                <circle cx='11' cy='11' r='8'></circle>
-                <path d='m21 21-4.35-4.35'></path>
-              </svg>
-            </button>
-          </form>
+          <button class='search-icon-btn' onclick='openSearch()' aria-label='Open search'>
+            <svg width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'>
+              <circle cx='11' cy='11' r='8'></circle>
+              <path d='m21 21-4.35-4.35'></path>
+            </svg>
+          </button>
+        </div>
+        
+        <!-- Search Overlay (opens when search icon is clicked) -->
+        <div class='search-overlay' id='searchOverlay' onclick='closeSearchIfClickOutside(event)'>
+          <div class='search-box-container'>
+            <button class='search-close-btn' onclick='closeSearch()' aria-label='Close search'>×</button>
+            <form action='/search' method='get'>
+              <input type='text' name='q' placeholder='Search...' aria-label='Search' id='searchInput' autocomplete='off'/>
+              <button type='submit'>Search</button>
+            </form>
+          </div>
         </div>
         
         <b:section class='header' id='header' maxwidgets='1' showaddelement='no'>
@@ -2107,6 +2188,41 @@ document.addEventListener('keydown', function(e) {
         e.preventDefault();
         firstFocusableElement.focus();
       }
+    }
+  }
+});
+
+// Search Overlay Functions
+function openSearch() {
+  var searchOverlay = document.getElementById('searchOverlay');
+  var searchInput = document.getElementById('searchInput');
+  searchOverlay.classList.add('active');
+  document.body.style.overflow = 'hidden';
+  
+  // Focus search input after a short delay
+  setTimeout(function() {
+    searchInput.focus();
+  }, 100);
+}
+
+function closeSearch() {
+  var searchOverlay = document.getElementById('searchOverlay');
+  searchOverlay.classList.remove('active');
+  document.body.style.overflow = '';
+}
+
+function closeSearchIfClickOutside(event) {
+  if (event.target.id === 'searchOverlay') {
+    closeSearch();
+  }
+}
+
+// Close search on Escape key
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') {
+    var searchOverlay = document.getElementById('searchOverlay');
+    if (searchOverlay && searchOverlay.classList.contains('active')) {
+      closeSearch();
     }
   }
 });
