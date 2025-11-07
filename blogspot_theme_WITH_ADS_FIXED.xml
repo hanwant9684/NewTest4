@@ -511,10 +511,7 @@ h3 { font-size: 1.25rem; }
   border: none !important;
 }
 
-/* Hide the PageList navigation completely for a cleaner look */
-#navigation {
-  display: none !important;
-}
+/* Navigation is now VISIBLE - Pages menu will show below header */
 
 .widget h2 {
   font-size: 1.125rem;
