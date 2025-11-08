@@ -5,24 +5,6 @@
     <meta content='width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes' name='viewport'/>
     <meta content='IE=edge' http-equiv='X-UA-Compatible'/>
     
-    <!-- Fix Blogger Mobile Redirect for Better Google Indexing -->
-    <script type='text/javascript'>
-    //<![CDATA[
-    // Remove ?m=1 parameter from URL to fix Google Search Console redirect errors
-    (function() {
-      var url = window.location.href;
-      if (url.indexOf('?m=1') !== -1 || url.indexOf('&m=1') !== -1) {
-        // Clean URL by removing mobile parameter
-        var cleanUrl = url.replace(/[\?&]m=1/g, '');
-        // Update browser URL without page reload
-        if (window.history && window.history.replaceState) {
-          window.history.replaceState(null, null, cleanUrl);
-        }
-      }
-    })();
-    //]]>
-    </script>
-    
     <b:if cond='data:view.isHomepage'>
       <title><data:blog.pageTitle/></title>
     <b:else/>
@@ -2039,24 +2021,25 @@ h3 { font-size: 1.25rem; }
         }
       }
       
-      // Popunder handler for next page button
-      var popunderOpened = false;
+      // Next page click handler - opens popunder and navigates in one click
       function handleNextPageClick(event, url) {
-        if (!popunderOpened) {
-          event.preventDefault();
-          popunderOpened = true;
-          
-          // Open popunder ad
+        event.preventDefault();
+        
+        try {
+          // Open popunder ad in background (non-blocking)
           var popunder = window.open('https://www.effectivegatecpm.com/zn01rc1vt?key=78d0724d73f6154a582464c95c28210d', '_blank');
-          
-          // Navigate to next page after short delay
-          setTimeout(function() {
-            window.location.href = url;
-          }, 300);
-          
-          return false;
+          if (popunder) {
+            popunder.blur();
+            window.focus();
+          }
+        } catch(e) {
+          console.log('[Ad] Popunder blocked:', e);
         }
-        return true;
+        
+        // Navigate to next page immediately (no delay needed)
+        window.location.href = url;
+        
+        return false;
       }
       
       // Start timer immediately

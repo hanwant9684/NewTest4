@@ -473,13 +473,19 @@ async def handle_download(bot_client, event, post_url: str, user_client=None, in
                 # Show completion message based on user type
                 user_type = db.get_user_type(event.sender_id)
                 if user_type == 'free':
-                    # Free users: show buttons for ads and upgrade
+                    # Free users: show buttons for ads and upgrade with remaining downloads count
+                    user = db.get_user(event.sender_id)
+                    ad_downloads_left = user.get('ad_downloads', 0) if user else 0
+                    
                     upgrade_keyboard = InlineKeyboardMarkup([
                         [InlineKeyboardButton.callback(f"🎁 Watch Ad & Get {PREMIUM_DOWNLOADS} Downloads", "watch_ad_now")],
                         [InlineKeyboardButton.callback("💰 Upgrade to Premium", "upgrade_premium")]
                     ])
+                    
+                    remaining_msg = f"\n📊 **{ad_downloads_left} free download(s) remaining**" if ad_downloads_left > 0 else "\n📊 **0 free downloads remaining**"
+                    
                     await event.respond(
-                        "✅ **Download complete**",
+                        f"✅ **Download complete**{remaining_msg}",
                         buttons=upgrade_keyboard.to_telethon()
                     )
                 else:
@@ -541,12 +547,19 @@ async def handle_download(bot_client, event, post_url: str, user_client=None, in
                     # Show completion message with buttons for all users
                     user_type = db.get_user_type(event.sender_id)
                     if user_type == 'free':
+                        # Get remaining downloads count
+                        user = db.get_user(event.sender_id)
+                        ad_downloads_left = user.get('ad_downloads', 0) if user else 0
+                        
                         upgrade_markup = InlineKeyboardMarkup([
                             [InlineKeyboardButton.callback(f"🎁 Watch Ad & Get {PREMIUM_DOWNLOADS} Downloads", "watch_ad_now")],
                             [InlineKeyboardButton.callback("💰 Upgrade to Premium", "upgrade_premium")]
                         ])
+                        
+                        remaining_msg = f"\n📊 **{ad_downloads_left} free download(s) remaining**" if ad_downloads_left > 0 else "\n📊 **0 free downloads remaining**"
+                        
                         await event.respond(
-                            "✅ **Download complete**",
+                            f"✅ **Download complete**{remaining_msg}",
                             buttons=upgrade_markup.to_telethon()
                         )
                     else:
@@ -1231,7 +1244,8 @@ async def get_premium_command(event):
         )
         
         markup = InlineKeyboardMarkup([
-            [InlineKeyboardButton.url(f"🎁 Start Verification (Visit Pages 1-5)", ad_url)]
+            [InlineKeyboardButton.url(f"🎁 Start Verification (Visit Pages 1-5)", ad_url)],
+            [InlineKeyboardButton.url("❓ Don't know How to Verify", "https://t.me/Wolfy004/43")]
         ])
         
         # Send with video (message ID 42)
