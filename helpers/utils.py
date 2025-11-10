@@ -17,6 +17,7 @@ from telethon.tl.types import (
 from helpers.files import (
     fileSizeLimit,
     cleanup_download,
+    cleanup_download_delayed,
     get_download_path
 )
 
@@ -827,19 +828,21 @@ async def processMediaGroup(chat_message, bot, message, user_id=None, user_clien
                 else:
                     LOGGER(__name__).warning(f"File {idx}/{total_files} was not sent (rejected by size limit or other error)")
                 
-                # STEP 3: Delete the file immediately to free RAM
+                # STEP 3: Delete the file with tier-based wait time to ensure proper cache/chunk clearing
                 try:
-                    cleanup_download(media_path)
+                    from database_sqlite import db
+                    await cleanup_download_delayed(media_path, user_id, db)
                     LOGGER(__name__).info(f"Cleaned up file {idx}/{total_files}: {media_path}")
                 except Exception as cleanup_err:
                     LOGGER(__name__).warning(f"Failed to cleanup file {idx}/{total_files}: {cleanup_err}")
                 
             except Exception as e:
                 LOGGER(__name__).error(f"Error processing file {idx}/{total_files} from message {msg.id}: {e}")
-                # Clean up on error
+                # Clean up on error with tier-based wait time
                 if media_path:
                     try:
-                        cleanup_download(media_path)
+                        from database_sqlite import db
+                        await cleanup_download_delayed(media_path, user_id, db)
                     except:
                         pass
                 continue

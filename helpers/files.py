@@ -16,6 +16,10 @@ def get_download_path(folder_id: int, filename: str, root_dir: str = "downloads"
 
 
 def cleanup_download(path: str) -> None:
+    """
+    Immediate cleanup of downloaded files (legacy function).
+    Use cleanup_download_delayed() for user-tier-based cleanup with proper wait times.
+    """
     try:
         if not path or path is None:
             LOGGER(__name__).debug("Cleanup skipped: path is None or empty")
@@ -31,6 +35,66 @@ def cleanup_download(path: str) -> None:
         folder = os.path.dirname(path)
         if os.path.isdir(folder) and not os.listdir(folder):
             os.rmdir(folder)
+
+    except Exception as e:
+        LOGGER(__name__).error(f"Cleanup failed for {path}: {e}")
+
+async def cleanup_download_delayed(path: str, user_id: int, db) -> None:
+    """
+    Cleanup downloaded files with tier-based wait time for proper cache/chunk clearing.
+    
+    Premium users: Faster cleanup (2 seconds) - optimized for performance
+    Free users: Longer wait (5 seconds) - ensures complete cache/chunk cleanup on Render
+    
+    This wait time allows:
+    - Telethon to complete all internal cleanup
+    - File system cache to flush properly
+    - Download chunks to be fully cleared from memory
+    - Prevents RAM spikes and crashes on constrained environments
+    
+    Args:
+        path: File path to cleanup
+        user_id: User ID to determine cleanup wait time
+        db: Database instance to check user type
+    """
+    import asyncio
+    from config import PyroConf
+    
+    try:
+        if not path or path is None:
+            LOGGER(__name__).debug("Cleanup skipped: path is None or empty")
+            return
+        
+        # Get user type to determine wait time
+        user_type = db.get_user_type(user_id)
+        is_premium = user_type in ['paid', 'admin']
+        
+        # Premium users get faster cleanup, free users get longer wait
+        wait_time = PyroConf.PREMIUM_CLEANUP_WAIT if is_premium else PyroConf.FREE_CLEANUP_WAIT
+        
+        LOGGER(__name__).info(
+            f"Scheduled cleanup for {os.path.basename(path)} "
+            f"({user_type} user: {wait_time}s wait for cache/chunk clearing)"
+        )
+        
+        # Wait to ensure all cache and chunks are properly cleared
+        await asyncio.sleep(wait_time)
+        
+        # Now perform cleanup
+        LOGGER(__name__).info(f"Cleaning Download: {path}")
+        
+        if os.path.exists(path):
+            os.remove(path)
+        if os.path.exists(path + ".temp"):
+            os.remove(path + ".temp")
+        if os.path.exists(path + ".tmp"):
+            os.remove(path + ".tmp")
+
+        folder = os.path.dirname(path)
+        if os.path.isdir(folder) and not os.listdir(folder):
+            os.rmdir(folder)
+        
+        LOGGER(__name__).info(f"✅ Cleanup complete for {os.path.basename(path)}")
 
     except Exception as e:
         LOGGER(__name__).error(f"Cleanup failed for {path}: {e}")
