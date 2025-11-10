@@ -56,6 +56,19 @@ class PyroConf:
 
     BOT_START_TIME = time()
     
+    # File Cleanup Wait Times (in seconds)
+    # Premium users get faster cleanup for better performance
+    # Free users get longer wait to ensure proper file cleanup and cache clearing
+    try:
+        PREMIUM_CLEANUP_WAIT = int(os.getenv("PREMIUM_CLEANUP_WAIT", "2"))
+    except ValueError:
+        PREMIUM_CLEANUP_WAIT = 2
+    
+    try:
+        FREE_CLEANUP_WAIT = int(os.getenv("FREE_CLEANUP_WAIT", "5"))
+    except ValueError:
+        FREE_CLEANUP_WAIT = 5
+    
     @staticmethod
     def get_app_url() -> str:
         """

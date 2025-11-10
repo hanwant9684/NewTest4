@@ -20,8 +20,10 @@ None specified yet. Add preferences as they are expressed.
 1.  **Media Handling:**
     *   **Queue Management:** Implements a download queue with concurrency control.
     *   **Efficient Media Group Downloads:** Processes media group files sequentially (download, upload, delete) to prevent high RAM usage, uploading them as individual messages rather than grouped albums for memory efficiency.
-    *   **Tiered Connection Scaling:** Dynamically adjusts download connections based on file size (e.g., 4 connections for files ≥1GB, 8 for files <200MB) to optimize RAM usage.
-    *   **Fast Downloads:** Utilizes FastTelethon for accelerated media transfers.
+    *   **Hybrid Transfer Approach (Nov 2025):**
+        *   **Downloads:** Uses Telethon's native streaming (`client.iter_download()`) for single-connection, chunk-by-chunk downloads that minimize RAM usage and prevent spikes on constrained environments like Render.
+        *   **Uploads:** Continues using FastTelethon with optimized parallel connections (3-6 connections based on file size) for faster upload speeds while maintaining RAM efficiency.
+        *   This hybrid approach provides the best balance between speed and memory safety, preventing crashes on Render's free tier while maintaining good performance.
 
 2.  **User & Session Management:**
     *   **Authentication & Access Control:** Features a user authentication and permission system, including phone-based authentication for restricted content.
@@ -35,6 +37,10 @@ None specified yet. Add preferences as they are expressed.
 
 4.  **System Stability & Optimization:**
     *   **RAM Optimization:** Implemented comprehensive memory optimizations including tiered connection scaling, asynchronous background tasks (using `asyncio.create_task`), and optimized data structures for memory monitoring.
+    *   **Tier-Based File Cleanup (Nov 2025):** Smart cleanup system that waits before deleting files to ensure proper cache/chunk clearing:
+        *   **Premium Users:** 2-second wait for optimal performance
+        *   **Free Users:** 5-second wait to ensure complete cache/chunk cleanup on constrained environments
+        *   This prevents RAM spikes and crashes on Render by allowing Telethon and file system to fully clear internal buffers and temporary data
     *   **Cloud-Only Backup:** Simplifies backup strategy to use only GitHub for database persistence, with automatic backups every 10 minutes.
     *   **Robust Error Handling:** Includes graceful shutdown mechanisms and proper background task tracking to prevent resource leaks and errors like "Task was destroyed but it is pending!".
     *   **SQLite Database:** Chosen for its portability and low resource footprint.

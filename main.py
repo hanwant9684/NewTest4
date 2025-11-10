@@ -35,6 +35,7 @@ from helpers.files import (
     get_readable_file_size,
     get_readable_time,
     cleanup_download,
+    cleanup_download_delayed,
     cleanup_orphaned_files
 )
 
@@ -566,8 +567,9 @@ async def handle_download(bot_client, event, post_url: str, user_client=None, in
                         # Send simple completion message for premium/admin users
                         await event.respond("✅ **Download complete**")
             finally:
-                # CRITICAL: Always cleanup downloaded file, even if errors occur during upload
-                cleanup_download(media_path)
+                # CRITICAL: Always cleanup downloaded file with tier-based wait time
+                # Premium: 2s wait | Free: 5s wait for proper cache/chunk clearing
+                await cleanup_download_delayed(media_path, event.sender_id, db)
 
         elif chat_message.text or chat_message.message:
             await event.respond(parsed_text or parsed_caption)

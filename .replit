@@ -1,4 +1,4 @@
-modules = ["python-3.12", "web"]
+modules = ["web", "python-3.11"]
 [agent]
 expertMode = true
 
@@ -89,6 +89,10 @@ externalPort = 3000
 [[ports]]
 localPort = 45793
 externalPort = 3001
+
+[[ports]]
+localPort = 45833
+externalPort = 9000
 
 [deployment]
 deploymentTarget = "vm"
