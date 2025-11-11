@@ -978,7 +978,7 @@ async def logout_command(event):
     except Exception as e:
         await event.respond(f"❌ **Error: {str(e)}**")
 
-@bot.on(events.NewMessage(pattern='/cancel', incoming=True, func=lambda e: e.is_private))
+@bot.on(events.NewMessage(pattern=r'^/cancel(\s|$)', incoming=True, func=lambda e: e.is_private))
 @register_user
 async def cancel_command(event):
     """Cancel pending authentication"""
@@ -988,11 +988,23 @@ async def cancel_command(event):
 @bot.on(events.NewMessage(pattern='/canceldownload', incoming=True, func=lambda e: e.is_private))
 @register_user
 async def cancel_download_command(event):
-    """Cancel user's running downloads"""
-    success, msg = await download_queue.cancel_user_download(event.sender_id)
-    await event.respond(msg)
-    if success:
-        LOGGER(__name__).info(f"User {event.sender_id} cancelled download")
+    """Cancel user's running downloads (including batch downloads)"""
+    queue_success, queue_msg = await download_queue.cancel_user_download(event.sender_id)
+    
+    batch_cancelled = cancel_user_tasks(event.sender_id)
+    
+    if queue_success or batch_cancelled > 0:
+        total_cancelled = (1 if queue_success else 0) + batch_cancelled
+        if batch_cancelled > 0:
+            await event.respond(
+                f"✅ **Cancelled {total_cancelled} download(s)!**\n\n"
+                "This includes any running batch downloads."
+            )
+        else:
+            await event.respond(queue_msg)
+        LOGGER(__name__).info(f"User {event.sender_id} cancelled {total_cancelled} download(s) (queue: {queue_success}, batch: {batch_cancelled})")
+    else:
+        await event.respond(queue_msg)
 
 @bot.on(events.NewMessage(pattern='/queue', incoming=True, func=lambda e: e.is_private))
 @register_user
