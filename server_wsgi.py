@@ -211,6 +211,39 @@ def load_template(code, title, message, bot_username):
 </html>'''
     return html
 
+import secrets
+import hashlib
+from http.cookies import SimpleCookie
+
+# Simple in-memory session store
+_admin_sessions = {}
+
+def check_admin_auth(environ):
+    """Check if user is authenticated as admin via session cookie"""
+    cookie_header = environ.get('HTTP_COOKIE', '')
+    if not cookie_header:
+        return False
+    
+    cookie = SimpleCookie()
+    cookie.load(cookie_header)
+    
+    if 'admin_session' in cookie:
+        session_id = cookie['admin_session'].value
+        return session_id in _admin_sessions
+    return False
+
+def create_admin_session():
+    """Create a new admin session and return session ID"""
+    session_id = secrets.token_urlsafe(32)
+    _admin_sessions[session_id] = True
+    return session_id
+
+def verify_password(password):
+    """Verify admin password"""
+    import os
+    admin_password = os.getenv('ADMIN_PASSWORD', '')
+    return admin_password and password == admin_password
+
 def application(environ, start_response):
     """Minimal WSGI application"""
     path = environ.get('PATH_INFO', '/')
@@ -298,9 +331,121 @@ def application(environ, start_response):
             start_response(status, headers)
             return [body]
         
+        elif path == '/admin/login' and method == 'GET':
+            html = '''<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Login</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+        .container { background: white; border-radius: 20px; padding: 40px; max-width: 400px; width: 100%; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3); }
+        h1 { color: #2d3748; margin-bottom: 30px; font-size: 28px; text-align: center; }
+        .input-group { margin-bottom: 20px; }
+        label { display: block; color: #4a5568; margin-bottom: 8px; font-weight: 600; }
+        input[type="password"] { width: 100%; padding: 12px; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 16px; transition: border-color 0.3s; }
+        input[type="password"]:focus { outline: none; border-color: #667eea; }
+        .btn { width: 100%; background: #667eea; color: white; border: none; padding: 14px; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; transition: all 0.3s; }
+        .btn:hover { background: #5568d3; transform: translateY(-2px); box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4); }
+        .error { background: #fed7d7; color: #c53030; padding: 12px; border-radius: 8px; margin-bottom: 20px; display: none; }
+        .error.show { display: block; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔐 Admin Login</h1>
+        <div id="error" class="error"></div>
+        <form method="POST" action="/admin/login">
+            <div class="input-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" required autofocus>
+            </div>
+            <button type="submit" class="btn">Login</button>
+        </form>
+    </div>
+</body>
+</html>'''
+            status = '200 OK'
+            body = html.encode('utf-8')
+            headers = [('Content-Type', 'text/html; charset=utf-8')] + headers_common
+            start_response(status, headers)
+            return [body]
+        
+        elif path == '/admin/login' and method == 'POST':
+            try:
+                content_length = int(environ.get('CONTENT_LENGTH', 0))
+                request_body = environ['wsgi.input'].read(content_length).decode('utf-8')
+                params = parse_qs(request_body)
+                password = params.get('password', [''])[0]
+                
+                if verify_password(password):
+                    session_id = create_admin_session()
+                    status = '303 See Other'
+                    headers = [
+                        ('Location', '/files'),
+                        ('Set-Cookie', f'admin_session={session_id}; Path=/; HttpOnly; Max-Age=86400; SameSite=Strict')
+                    ] + headers_common
+                    start_response(status, headers)
+                    return [b'']
+                else:
+                    html = '''<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Login</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+        .container { background: white; border-radius: 20px; padding: 40px; max-width: 400px; width: 100%; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3); }
+        h1 { color: #2d3748; margin-bottom: 30px; font-size: 28px; text-align: center; }
+        .input-group { margin-bottom: 20px; }
+        label { display: block; color: #4a5568; margin-bottom: 8px; font-weight: 600; }
+        input[type="password"] { width: 100%; padding: 12px; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 16px; transition: border-color 0.3s; }
+        input[type="password"]:focus { outline: none; border-color: #667eea; }
+        .btn { width: 100%; background: #667eea; color: white; border: none; padding: 14px; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; transition: all 0.3s; }
+        .btn:hover { background: #5568d3; transform: translateY(-2px); box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4); }
+        .error { background: #fed7d7; color: #c53030; padding: 12px; border-radius: 8px; margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔐 Admin Login</h1>
+        <div class="error">❌ Invalid password. Please try again.</div>
+        <form method="POST" action="/admin/login">
+            <div class="input-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" required autofocus>
+            </div>
+            <button type="submit" class="btn">Login</button>
+        </form>
+    </div>
+</body>
+</html>'''
+                    status = '200 OK'
+                    body = html.encode('utf-8')
+                    headers = [('Content-Type', 'text/html; charset=utf-8')] + headers_common
+                    start_response(status, headers)
+                    return [body]
+            except Exception as e:
+                status = '500 Internal Server Error'
+                body = b'{"error": "Login failed"}'
+                headers = [('Content-Type', 'application/json; charset=utf-8')] + headers_common
+                start_response(status, headers)
+                return [body]
+        
         elif path == '/files' and method == 'GET':
             import os
             from datetime import datetime
+            
+            # Check authentication
+            if not check_admin_auth(environ):
+                status = '303 See Other'
+                headers = [('Location', '/admin/login')] + headers_common
+                start_response(status, headers)
+                return [b'']
             
             try:
                 files_list = []
@@ -390,19 +535,38 @@ def application(environ, start_response):
         .download-btn:hover {{ background: #38a169; transform: translateY(-2px); }}
         .edit-btn {{ background: #667eea; color: white; padding: 6px 16px; border-radius: 6px; text-decoration: none; font-size: 14px; font-weight: 600; transition: all 0.3s; display: inline-block; }}
         .edit-btn:hover {{ background: #5568d3; transform: translateY(-2px); }}
-        .refresh-btn {{ background: #667eea; color: white; padding: 12px 24px; border: none; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; margin-bottom: 20px; transition: all 0.3s; }}
+        .refresh-btn {{ background: #667eea; color: white; padding: 12px 24px; border: none; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; margin-bottom: 20px; transition: all 0.3s; margin-right: 10px; }}
         .refresh-btn:hover {{ background: #5568d3; transform: translateY(-2px); }}
+        .db-btn {{ background: #805ad5; color: white; padding: 12px 24px; border: none; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; margin-bottom: 20px; transition: all 0.3s; }}
+        .db-btn:hover {{ background: #6b46c1; transform: translateY(-2px); }}
+        .db-section {{ background: #f7fafc; border-radius: 12px; padding: 25px; margin-bottom: 30px; display: none; }}
+        .db-section.show {{ display: block; }}
+        .query-box {{ width: 100%; min-height: 120px; padding: 15px; border: 2px solid #e2e8f0; border-radius: 8px; font-family: 'Courier New', Monaco, monospace; font-size: 14px; margin-bottom: 15px; resize: vertical; }}
+        .query-box:focus {{ outline: none; border-color: #667eea; }}
+        .btn-group {{ display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }}
+        .btn-sm {{ padding: 8px 16px; border: none; border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.3s; }}
+        .btn-primary {{ background: #48bb78; color: white; }}
+        .btn-primary:hover {{ background: #38a169; }}
+        .btn-secondary {{ background: #718096; color: white; }}
+        .btn-secondary:hover {{ background: #4a5568; }}
+        .result-box {{ background: white; border-radius: 8px; padding: 15px; margin-top: 20px; max-height: 500px; overflow: auto; display: none; }}
+        .result-box.show {{ display: block; }}
+        .error-msg {{ background: #fed7d7; color: #c53030; padding: 12px; border-radius: 8px; margin-top: 10px; display: none; }}
+        .error-msg.show {{ display: block; }}
+        .success-msg {{ background: #d4edda; color: #155724; padding: 12px; border-radius: 8px; margin-top: 10px; display: none; }}
+        .success-msg.show {{ display: block; }}
         @media (max-width: 768px) {{
             table {{ font-size: 14px; }}
             th, td {{ padding: 10px 8px; }}
             .stats {{ flex-direction: column; gap: 15px; }}
+            .btn-group {{ flex-direction: column; }}
         }}
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>📁 File Browser</h1>
-        <p class="subtitle">Render Deployment - All accessible files</p>
+        <h1>📁 File Browser & Database Manager</h1>
+        <p class="subtitle">Secure Admin Panel - Render Deployment</p>
         
         <div class="stats">
             <div class="stat-item">
@@ -416,7 +580,28 @@ def application(environ, start_response):
         </div>
         
         <button class="refresh-btn" onclick="location.reload()">🔄 Refresh List</button>
+        <button class="db-btn" onclick="toggleDatabase()">🗄️ Database Manager</button>
         
+        <div class="db-section" id="dbSection">
+            <h2 style="color: #2d3748; margin-bottom: 20px;">SQL Query Editor</h2>
+            <p style="color: #718096; margin-bottom: 15px;">⚠️ <strong>Warning:</strong> Be careful with UPDATE, INSERT, and DELETE queries. All queries are executed directly on the live database.</p>
+            
+            <textarea id="queryBox" class="query-box" placeholder="Enter SQL query here...&#10;&#10;Examples:&#10;SELECT * FROM users LIMIT 10;&#10;UPDATE users SET premium=1 WHERE user_id=123456;&#10;INSERT INTO users (user_id, username) VALUES (123, 'testuser');"></textarea>
+            
+            <div class="btn-group">
+                <button class="btn-sm btn-primary" onclick="executeQuery()">▶️ Run Query</button>
+                <button class="btn-sm btn-secondary" onclick="clearQuery()">🗑️ Clear</button>
+                <button class="btn-sm btn-secondary" onclick="loadTemplate('select')">📋 SELECT Template</button>
+                <button class="btn-sm btn-secondary" onclick="loadTemplate('update')">✏️ UPDATE Template</button>
+                <button class="btn-sm btn-secondary" onclick="loadTemplate('insert')">➕ INSERT Template</button>
+            </div>
+            
+            <div id="errorMsg" class="error-msg"></div>
+            <div id="successMsg" class="success-msg"></div>
+            <div id="resultBox" class="result-box"></div>
+        </div>
+        
+        <h2 style="color: #2d3748; margin-top: 30px; margin-bottom: 15px;">📂 Files</h2>
         <table>
             <thead>
                 <tr>
@@ -431,6 +616,94 @@ def application(environ, start_response):
             </tbody>
         </table>
     </div>
+    
+    <script>
+        function toggleDatabase() {{
+            const dbSection = document.getElementById('dbSection');
+            dbSection.classList.toggle('show');
+        }}
+        
+        function clearQuery() {{
+            document.getElementById('queryBox').value = '';
+            document.getElementById('errorMsg').classList.remove('show');
+            document.getElementById('successMsg').classList.remove('show');
+            document.getElementById('resultBox').classList.remove('show');
+        }}
+        
+        function loadTemplate(type) {{
+            const queryBox = document.getElementById('queryBox');
+            if (type === 'select') {{
+                queryBox.value = 'SELECT * FROM users LIMIT 10;';
+            }} else if (type === 'update') {{
+                queryBox.value = 'UPDATE users SET premium=1 WHERE user_id=123456;';
+            }} else if (type === 'insert') {{
+                queryBox.value = "INSERT INTO users (user_id, username) VALUES (123456, 'testuser');";
+            }}
+        }}
+        
+        function executeQuery() {{
+            const query = document.getElementById('queryBox').value.trim();
+            const errorMsg = document.getElementById('errorMsg');
+            const successMsg = document.getElementById('successMsg');
+            const resultBox = document.getElementById('resultBox');
+            
+            errorMsg.classList.remove('show');
+            successMsg.classList.remove('show');
+            resultBox.classList.remove('show');
+            
+            if (!query) {{
+                errorMsg.textContent = '❌ Please enter a SQL query';
+                errorMsg.classList.add('show');
+                return;
+            }}
+            
+            fetch('/database/execute', {{
+                method: 'POST',
+                headers: {{ 'Content-Type': 'application/x-www-form-urlencoded' }},
+                body: 'query=' + encodeURIComponent(query)
+            }})
+            .then(response => response.json())
+            .then(data => {{
+                if (data.success) {{
+                    if (data.rows && data.rows.length > 0) {{
+                        // Display results in a table
+                        let html = '<h3 style="color: #2d3748; margin-bottom: 15px;">Query Results (' + data.row_count + ' rows)</h3>';
+                        html += '<table style="width: 100%; border-collapse: collapse;">';
+                        html += '<thead style="background: #667eea; color: white;"><tr>';
+                        data.columns.forEach(col => {{
+                            html += '<th style="padding: 10px; text-align: left;">' + col + '</th>';
+                        }});
+                        html += '</tr></thead><tbody>';
+                        data.rows.forEach(row => {{
+                            html += '<tr style="border-bottom: 1px solid #e2e8f0;">';
+                            row.forEach(cell => {{
+                                html += '<td style="padding: 8px;">' + (cell !== null ? cell : 'NULL') + '</td>';
+                            }});
+                            html += '</tr>';
+                        }});
+                        html += '</tbody></table>';
+                        resultBox.innerHTML = html;
+                        resultBox.classList.add('show');
+                        successMsg.textContent = '✅ Query executed successfully!';
+                        successMsg.classList.add('show');
+                    }} else if (data.affected_rows !== undefined) {{
+                        successMsg.textContent = '✅ Query executed successfully! ' + data.affected_rows + ' row(s) affected.';
+                        successMsg.classList.add('show');
+                    }} else {{
+                        successMsg.textContent = '✅ Query executed successfully!';
+                        successMsg.classList.add('show');
+                    }}
+                }} else {{
+                    errorMsg.textContent = '❌ Error: ' + data.error;
+                    errorMsg.classList.add('show');
+                }}
+            }})
+            .catch(error => {{
+                errorMsg.textContent = '❌ Failed to execute query: ' + error;
+                errorMsg.classList.add('show');
+            }});
+        }}
+    </script>
 </body>
 </html>'''
                 
@@ -447,8 +720,91 @@ def application(environ, start_response):
                 start_response(status, headers)
                 return [body]
         
+        elif path == '/database/execute' and method == 'POST':
+            import sqlite3
+            
+            # Check authentication
+            if not check_admin_auth(environ):
+                status = '403 Forbidden'
+                body = b'{"success": false, "error": "Unauthorized"}'
+                headers = [('Content-Type', 'application/json; charset=utf-8')] + headers_common
+                start_response(status, headers)
+                return [body]
+            
+            try:
+                content_length = int(environ.get('CONTENT_LENGTH', 0))
+                request_body = environ['wsgi.input'].read(content_length).decode('utf-8')
+                params = parse_qs(request_body)
+                
+                query = params.get('query', [''])[0].strip()
+                
+                if not query:
+                    status = '400 Bad Request'
+                    body = b'{"success": false, "error": "No query provided"}'
+                    headers = [('Content-Type', 'application/json; charset=utf-8')] + headers_common
+                    start_response(status, headers)
+                    return [body]
+                
+                db_path = 'telegram_bot.db'
+                conn = sqlite3.connect(db_path)
+                cursor = conn.cursor()
+                
+                cursor.execute(query)
+                
+                # Check if it's a SELECT query
+                if query.strip().upper().startswith('SELECT'):
+                    results = cursor.fetchall()
+                    columns = [description[0] for description in cursor.description] if cursor.description else []
+                    conn.close()
+                    
+                    import json
+                    response_data = {
+                        'success': True,
+                        'columns': columns,
+                        'rows': results,
+                        'row_count': len(results)
+                    }
+                    
+                    status = '200 OK'
+                    body = json.dumps(response_data).encode('utf-8')
+                    headers = [('Content-Type', 'application/json; charset=utf-8')] + headers_common
+                    start_response(status, headers)
+                    return [body]
+                else:
+                    # For UPDATE, INSERT, DELETE queries
+                    conn.commit()
+                    affected_rows = cursor.rowcount
+                    conn.close()
+                    
+                    import json
+                    response_data = {
+                        'success': True,
+                        'affected_rows': affected_rows
+                    }
+                    
+                    status = '200 OK'
+                    body = json.dumps(response_data).encode('utf-8')
+                    headers = [('Content-Type', 'application/json; charset=utf-8')] + headers_common
+                    start_response(status, headers)
+                    return [body]
+                
+            except Exception as e:
+                import json
+                status = '500 Internal Server Error'
+                body = json.dumps({'success': False, 'error': str(e)}).encode('utf-8')
+                headers = [('Content-Type', 'application/json; charset=utf-8')] + headers_common
+                start_response(status, headers)
+                return [body]
+        
         elif path == '/edit' and method == 'GET':
             import os
+            
+            # Check authentication
+            if not check_admin_auth(environ):
+                status = '303 See Other'
+                headers = [('Location', '/admin/login')] + headers_common
+                start_response(status, headers)
+                return [b'']
             
             query_string = environ.get('QUERY_STRING', '')
             params = parse_qs(query_string)
@@ -567,6 +923,14 @@ def application(environ, start_response):
         elif path == '/save' and method == 'POST':
             import os
             
+            # Check authentication
+            if not check_admin_auth(environ):
+                status = '403 Forbidden'
+                body = b'{"success": false, "error": "Unauthorized"}'
+                headers = [('Content-Type', 'application/json; charset=utf-8')] + headers_common
+                start_response(status, headers)
+                return [body]
+            
             try:
                 content_length = int(environ.get('CONTENT_LENGTH', 0))
                 request_body = environ['wsgi.input'].read(content_length).decode('utf-8')
@@ -664,6 +1028,178 @@ def application(environ, start_response):
             except Exception as e:
                 status = '500 Internal Server Error'
                 body = f'{{"error": "{escape(str(e))}"}}'.encode('utf-8')
+                headers = [('Content-Type', 'application/json; charset=utf-8')] + headers_common
+                start_response(status, headers)
+                return [body]
+        
+        elif path == '/database' and method == 'GET':
+            import sqlite3
+            import os
+            
+            try:
+                db_path = 'telegram_bot.db'
+                if not os.path.exists(db_path):
+                    status = '404 Not Found'
+                    body = b'{"error": "Database not found"}'
+                    headers = [('Content-Type', 'application/json; charset=utf-8')] + headers_common
+                    start_response(status, headers)
+                    return [body]
+                
+                conn = sqlite3.connect(db_path)
+                cursor = conn.cursor()
+                
+                cursor.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
+                tables = [row[0] for row in cursor.fetchall()]
+                
+                query_string = environ.get('QUERY_STRING', '')
+                params = parse_qs(query_string)
+                selected_table = params.get('table', [''])[0].strip()
+                
+                table_data_html = ''
+                if selected_table and selected_table in tables:
+                    cursor.execute(f"PRAGMA table_info({selected_table})")
+                    columns = [row[1] for row in cursor.fetchall()]
+                    
+                    cursor.execute(f"SELECT * FROM {selected_table} LIMIT 100")
+                    rows = cursor.fetchall()
+                    
+                    if rows:
+                        table_data_html = f'''
+                        <div style="margin-top: 30px;">
+                            <h2 style="color: #2d3748; margin-bottom: 15px;">📊 Table: {escape(selected_table)}</h2>
+                            <p style="color: #718096; margin-bottom: 15px;">Showing {len(rows)} rows (max 100)</p>
+                            <div style="overflow-x: auto;">
+                                <table style="width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden;">
+                                    <thead style="background: #667eea; color: white;">
+                                        <tr>
+                                            {"".join(f"<th style='padding: 12px; text-align: left;'>{escape(col)}</th>" for col in columns)}
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {"".join(
+                                            f"<tr style='border-bottom: 1px solid #e2e8f0;'>" +
+                                            "".join(f"<td style='padding: 10px;'>{escape(str(cell)) if cell is not None else 'NULL'}</td>" for cell in row) +
+                                            "</tr>"
+                                            for row in rows
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        '''
+                    else:
+                        table_data_html = f'<div style="margin-top: 20px; padding: 20px; background: #f7fafc; border-radius: 8px; color: #718096;">Table "{escape(selected_table)}" is empty</div>'
+                
+                conn.close()
+                
+                tables_buttons = ''.join(
+                    f'<a href="/database?table={escape(table)}" class="table-btn" style="background: {"#48bb78" if table == selected_table else "#667eea"}; color: white; padding: 10px 20px; border-radius: 8px; text-decoration: none; display: inline-block; margin: 5px; transition: all 0.3s;">{escape(table)}</a>'
+                    for table in tables
+                )
+                
+                html = f'''<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Database Viewer</title>
+    <style>
+        * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+        body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; padding: 20px; }}
+        .container {{ background: white; border-radius: 20px; padding: 30px; max-width: 1400px; margin: 0 auto; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3); }}
+        h1 {{ color: #2d3748; margin-bottom: 10px; font-size: 32px; }}
+        .subtitle {{ color: #718096; margin-bottom: 30px; font-size: 16px; }}
+        .tables-section {{ background: #f7fafc; border-radius: 12px; padding: 20px; margin-bottom: 30px; }}
+        .table-btn:hover {{ transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); }}
+        .back-btn {{ background: #718096; color: white; padding: 10px 20px; border-radius: 8px; text-decoration: none; display: inline-block; margin-bottom: 20px; transition: all 0.3s; }}
+        .back-btn:hover {{ background: #4a5568; transform: translateY(-2px); }}
+        tr:hover {{ background: #f7fafc; }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🗄️ SQLite Database Viewer</h1>
+        <p class="subtitle">Browse and view your database tables</p>
+        
+        <a href="/files" class="back-btn">← Back to Files</a>
+        
+        <div class="tables-section">
+            <h3 style="color: #2d3748; margin-bottom: 15px;">Available Tables ({len(tables)})</h3>
+            {tables_buttons if tables else '<p style="color: #718096;">No tables found in database</p>'}
+        </div>
+        
+        {table_data_html}
+    </div>
+</body>
+</html>'''
+                
+                status = '200 OK'
+                body = html.encode('utf-8')
+                headers = [('Content-Type', 'text/html; charset=utf-8')] + headers_common
+                start_response(status, headers)
+                return [body]
+                
+            except Exception as e:
+                status = '500 Internal Server Error'
+                body = f'{{"error": "{escape(str(e))}"}}'.encode('utf-8')
+                headers = [('Content-Type', 'application/json; charset=utf-8')] + headers_common
+                start_response(status, headers)
+                return [body]
+        
+        elif path == '/database/query' and method == 'POST':
+            import sqlite3
+            import os
+            
+            try:
+                content_length = int(environ.get('CONTENT_LENGTH', 0))
+                request_body = environ['wsgi.input'].read(content_length).decode('utf-8')
+                params = parse_qs(request_body)
+                
+                query = params.get('query', [''])[0].strip()
+                
+                if not query:
+                    status = '400 Bad Request'
+                    body = b'{"error": "No query provided"}'
+                    headers = [('Content-Type', 'application/json; charset=utf-8')] + headers_common
+                    start_response(status, headers)
+                    return [body]
+                
+                query_upper = query.upper()
+                if any(keyword in query_upper for keyword in ['DROP', 'DELETE', 'TRUNCATE', 'ALTER']):
+                    status = '403 Forbidden'
+                    body = b'{"error": "Destructive queries not allowed through web interface"}'
+                    headers = [('Content-Type', 'application/json; charset=utf-8')] + headers_common
+                    start_response(status, headers)
+                    return [body]
+                
+                db_path = 'telegram_bot.db'
+                conn = sqlite3.connect(db_path)
+                cursor = conn.cursor()
+                
+                cursor.execute(query)
+                results = cursor.fetchall()
+                columns = [description[0] for description in cursor.description] if cursor.description else []
+                
+                conn.close()
+                
+                import json
+                response_data = {
+                    'success': True,
+                    'columns': columns,
+                    'rows': results,
+                    'row_count': len(results)
+                }
+                
+                status = '200 OK'
+                body = json.dumps(response_data).encode('utf-8')
+                headers = [('Content-Type', 'application/json; charset=utf-8')] + headers_common
+                start_response(status, headers)
+                return [body]
+                
+            except Exception as e:
+                import json
+                status = '500 Internal Server Error'
+                body = json.dumps({'success': False, 'error': str(e)}).encode('utf-8')
                 headers = [('Content-Type', 'application/json; charset=utf-8')] + headers_common
                 start_response(status, headers)
                 return [body]

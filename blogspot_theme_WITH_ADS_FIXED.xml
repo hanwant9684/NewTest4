@@ -1359,6 +1359,181 @@ h3 { font-size: 1.25rem; }
 }
 
 ]]></b:skin>
+    
+    <!-- AdBlock Detection and Blocker Script -->
+    <style>
+      #adblock-modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.95);
+        z-index: 999999;
+        justify-content: center;
+        align-items: center;
+        backdrop-filter: blur(10px);
+      }
+      
+      #adblock-modal.show {
+        display: flex !important;
+      }
+      
+      .adblock-content {
+        background: white;
+        padding: 40px;
+        border-radius: 20px;
+        max-width: 500px;
+        width: 90%;
+        text-align: center;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        animation: slideIn 0.5s ease-out;
+      }
+      
+      @keyframes slideIn {
+        from {
+          transform: translateY(-50px);
+          opacity: 0;
+        }
+        to {
+          transform: translateY(0);
+          opacity: 1;
+        }
+      }
+      
+      .adblock-icon {
+        font-size: 80px;
+        margin-bottom: 20px;
+        animation: pulse 2s infinite;
+      }
+      
+      @keyframes pulse {
+        0%, 100% {
+          transform: scale(1);
+        }
+        50% {
+          transform: scale(1.1);
+        }
+      }
+      
+      .adblock-title {
+        color: #e53e3e;
+        font-size: 28px;
+        font-weight: bold;
+        margin-bottom: 15px;
+      }
+      
+      .adblock-message {
+        color: #2d3748;
+        font-size: 16px;
+        line-height: 1.6;
+        margin-bottom: 25px;
+      }
+      
+      .adblock-instructions {
+        background: #f7fafc;
+        padding: 20px;
+        border-radius: 12px;
+        text-align: left;
+        margin-bottom: 25px;
+      }
+      
+      .adblock-instructions h3 {
+        color: #2d3748;
+        font-size: 18px;
+        margin-bottom: 10px;
+      }
+      
+      .adblock-instructions ol {
+        color: #4a5568;
+        padding-left: 20px;
+        line-height: 1.8;
+      }
+      
+      .adblock-button {
+        background: #48bb78;
+        color: white;
+        border: none;
+        padding: 15px 40px;
+        font-size: 16px;
+        font-weight: 600;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.3s;
+      }
+      
+      .adblock-button:hover {
+        background: #38a169;
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(72, 187, 120, 0.4);
+      }
+      
+      body.adblock-detected {
+        overflow: hidden !important;
+      }
+    </style>
+    
+    <script type='text/javascript'>
+    //<![CDATA[
+    (function() {
+      var adBlockDetected = false;
+      
+      function detectAdBlock() {
+        var testAd = document.createElement('div');
+        testAd.innerHTML = '&nbsp;';
+        testAd.className = 'adsbox ad-placement ad-placeholder adbanner adsbygoogle adslot';
+        testAd.style.position = 'absolute';
+        testAd.style.left = '-9999px';
+        testAd.style.height = '1px';
+        document.body.appendChild(testAd);
+        
+        setTimeout(function() {
+          if (testAd.offsetHeight === 0 || testAd.clientHeight === 0 || window.getComputedStyle(testAd).display === 'none') {
+            adBlockDetected = true;
+            showAdBlockModal();
+          }
+          document.body.removeChild(testAd);
+        }, 100);
+      }
+      
+      function showAdBlockModal() {
+        var modal = document.getElementById('adblock-modal');
+        if (!modal) {
+          modal = document.createElement('div');
+          modal.id = 'adblock-modal';
+          modal.innerHTML = '<div class="adblock-content">' +
+            '<div class="adblock-icon">🚫</div>' +
+            '<h2 class="adblock-title">AdBlock Detected!</h2>' +
+            '<p class="adblock-message">We noticed you\'re using an ad blocker. This site is supported by ads, and we need your support to keep providing great content for free.</p>' +
+            '<div class="adblock-instructions">' +
+            '<h3>📋 How to continue:</h3>' +
+            '<ol>' +
+            '<li>Disable your ad blocker for this site</li>' +
+            '<li>Click the "I\'ve Disabled AdBlock" button below</li>' +
+            '<li>Enjoy our content!</li>' +
+            '</ol>' +
+            '</div>' +
+            '<button class="adblock-button" onclick="checkAdBlockAgain()">✅ I\'ve Disabled AdBlock</button>' +
+            '</div>';
+          document.body.appendChild(modal);
+        }
+        modal.classList.add('show');
+        document.body.classList.add('adblock-detected');
+      }
+      
+      window.checkAdBlockAgain = function() {
+        location.reload();
+      };
+      
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', detectAdBlock);
+      } else {
+        detectAdBlock();
+      }
+    })();
+    //]]>
+    </script>
   </head>
 
   <body>
