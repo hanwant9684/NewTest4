@@ -2,11 +2,25 @@
 # Telethon-compatible version
 
 import os
+import asyncio
 from time import time
 from logger import LOGGER
 from typing import Optional
 from asyncio.subprocess import PIPE
 from asyncio import create_subprocess_exec, create_subprocess_shell, wait_for
+
+def get_intra_request_delay(is_premium):
+    """
+    Get the appropriate delay between items in media groups or batch downloads.
+    
+    Args:
+        is_premium: Boolean indicating if user is premium/admin (True) or free (False)
+        
+    Returns:
+        int: Delay in seconds (1s for premium, 3s for free users)
+    """
+    from config import PyroConf
+    return PyroConf.PREMIUM_INTRA_DELAY if is_premium else PyroConf.FREE_INTRA_DELAY
 
 from telethon.tl.types import (
     DocumentAttributeVideo,
@@ -756,6 +770,16 @@ async def processMediaGroup(chat_message, bot, message, user_id=None, user_clien
     total_files = len(grouped_messages)
     files_sent_count = 0
     
+    # Determine user tier once for all files (avoid blocking DB calls in loop)
+    is_premium = False
+    if user_id:
+        try:
+            from database_sqlite import db
+            user_type = db.get_user_type(user_id)
+            is_premium = user_type in ['paid', 'admin']
+        except Exception as e:
+            LOGGER(__name__).warning(f"Could not determine user tier, using free tier: {e}")
+    
     start_time = time()
     progress_message = await message.reply(f"📥 Processing media group ({total_files} files)...")
     LOGGER(__name__).info(
@@ -836,6 +860,12 @@ async def processMediaGroup(chat_message, bot, message, user_id=None, user_clien
                 except Exception as cleanup_err:
                     LOGGER(__name__).warning(f"Failed to cleanup file {idx}/{total_files}: {cleanup_err}")
                 
+                # STEP 4: Tier-aware cooldown between files (skip for last file)
+                if idx < total_files:
+                    delay = get_intra_request_delay(is_premium)
+                    await asyncio.sleep(delay)
+                    LOGGER(__name__).debug(f"Cooldown complete ({delay}s) before next file")
+                
             except Exception as e:
                 LOGGER(__name__).error(f"Error processing file {idx}/{total_files} from message {msg.id}: {e}")
                 # Clean up on error with tier-based wait time
@@ -845,6 +875,12 @@ async def processMediaGroup(chat_message, bot, message, user_id=None, user_clien
                         await cleanup_download_delayed(media_path, user_id, db)
                     except:
                         pass
+                
+                # Apply tier-aware cooldown even on error (skip for last file)
+                if idx < total_files:
+                    delay = get_intra_request_delay(is_premium)
+                    await asyncio.sleep(delay)
+                
                 continue
 
     # Cleanup throttle data for this progress message
