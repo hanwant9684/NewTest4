@@ -575,6 +575,172 @@ h3 { font-size: 1.25rem; }
   color: #6b7280;
 }
 
+/* Table of Contents Styling - Apple Glassmorphism */
+.table-of-contents {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  color: #1d1d1f;
+  padding: 1.5rem;
+  margin: 2rem 0;
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  position: relative;
+  overflow: hidden;
+}
+
+.table-of-contents h4 {
+  margin: 0 0 1rem 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  position: relative;
+  z-index: 1;
+  user-select: none;
+  color: #1d1d1f;
+}
+
+.table-of-contents h4:hover {
+  opacity: 0.7;
+}
+
+.table-of-contents h4::before {
+  content: '📑';
+  font-size: 1.5rem;
+}
+
+.toc-toggle-icon {
+  margin-left: auto;
+  transition: transform 0.3s ease;
+  font-size: 0.875rem;
+}
+
+.toc-toggle-icon.expanded {
+  transform: rotate(90deg);
+}
+
+.table-of-contents ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  position: relative;
+  z-index: 1;
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+.table-of-contents ul::-webkit-scrollbar {
+  width: 6px;
+}
+
+.table-of-contents ul::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 3px;
+}
+
+.table-of-contents ul::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
+}
+
+.table-of-contents ul::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.table-of-contents li {
+  margin: 0.5rem 0;
+  padding-left: 0;
+  transition: all 0.2s ease;
+}
+
+.table-of-contents li.toc-h3 {
+  padding-left: 1.5rem;
+  font-size: 0.9rem;
+}
+
+.table-of-contents a {
+  color: #1d1d1f;
+  text-decoration: none;
+  display: block;
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+  background: rgba(0, 0, 0, 0.03);
+  font-weight: 500;
+}
+
+.table-of-contents a:hover {
+  background: rgba(0, 0, 0, 0.08);
+  transform: translateX(5px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+/* Smooth scroll for anchor links */
+html {
+  scroll-behavior: smooth;
+}
+
+h2[id], h3[id] {
+  scroll-margin-top: 80px;
+}
+
+/* Mobile responsive TOC */
+@media (max-width: 768px) {
+  .table-of-contents {
+    padding: 1rem;
+    border-radius: 12px;
+  }
+  
+  .table-of-contents h4 {
+    font-size: 1.1rem;
+  }
+  
+  .table-of-contents li.toc-h3 {
+    padding-left: 1rem;
+  }
+  
+  .table-of-contents a {
+    font-size: 0.95rem;
+  }
+}
+
+/* Dark mode support for glassmorphic TOC */
+@media (prefers-color-scheme: dark) {
+  .table-of-contents {
+    background: rgba(28, 28, 30, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+  
+  .table-of-contents h4,
+  .table-of-contents a {
+    color: #f5f5f7;
+  }
+  
+  .table-of-contents a {
+    background: rgba(255, 255, 255, 0.05);
+  }
+  
+  .table-of-contents a:hover {
+    background: rgba(255, 255, 255, 0.12);
+  }
+  
+  .table-of-contents ul::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+  }
+  
+  .table-of-contents ul::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+  }
+  
+  .table-of-contents ul::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.3);
+  }
+}
+
 .blog-pager {
   display: flex;
   justify-content: space-between;
@@ -2333,6 +2499,134 @@ window.addEventListener('load', function() {
 });
 //]]>
     </script>
+
+    <!-- Automatic Table of Contents Generator (Post Pages Only) -->
+    <b:if cond='data:view.isPost'>
+    <script type='text/javascript'>
+    //<![CDATA[
+    (function() {
+      'use strict';
+      
+      // Wait for DOM to be fully loaded
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initTableOfContents);
+      } else {
+        initTableOfContents();
+      }
+      
+      function initTableOfContents() {
+        try {
+          // Find the article content container
+          var articleContent = document.getElementById('article-content');
+          if (!articleContent) {
+            console.log('[TOC] Article content container not found');
+            return;
+          }
+          
+          // Find all H2 and H3 headings
+          var headings = articleContent.querySelectorAll('h2, h3');
+          
+          // Only create TOC if there are 2 or more headings
+          if (headings.length < 2) {
+            console.log('[TOC] Not enough headings (' + headings.length + '), skipping TOC');
+            return;
+          }
+          
+          // Generate unique IDs for headings and build TOC structure
+          var tocHTML = '';
+          var headingIndex = 0;
+          
+          Array.prototype.forEach.call(headings, function(heading) {
+            var headingText = heading.textContent.trim();
+            var headingLevel = heading.tagName.toLowerCase();
+            
+            // Generate slug-based ID (or use existing if present)
+            var headingId = heading.id;
+            if (!headingId) {
+              headingId = 'toc-' + headingText
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, '-')
+                .replace(/^-+|-+$/g, '')
+                .substring(0, 50) + '-' + headingIndex;
+              heading.id = headingId;
+            }
+            
+            // Build TOC list item
+            var liClass = headingLevel === 'h3' ? 'toc-h3' : '';
+            tocHTML += '<li class="' + liClass + '">';
+            tocHTML += '<a href="#' + headingId + '">' + headingText + '</a>';
+            tocHTML += '</li>';
+            
+            headingIndex++;
+          });
+          
+          // Create TOC container
+          var tocContainer = document.createElement('nav');
+          tocContainer.className = 'table-of-contents';
+          tocContainer.setAttribute('role', 'navigation');
+          tocContainer.setAttribute('aria-label', 'Table of Contents');
+          
+          tocContainer.innerHTML = 
+            '<h4 onclick="toggleTOC(this)">' +
+            'Table of Contents' +
+            '<span class="toc-toggle-icon expanded">▼</span>' +
+            '</h4>' +
+            '<ul id="toc-list">' + tocHTML + '</ul>';
+          
+          // Insert TOC before the first heading
+          var firstHeading = headings[0];
+          firstHeading.parentNode.insertBefore(tocContainer, firstHeading);
+          
+          console.log('[TOC] Successfully generated TOC with ' + headings.length + ' headings');
+          
+        } catch (error) {
+          console.error('[TOC] Error generating table of contents:', error);
+        }
+      }
+      
+      // Toggle function (global scope for onclick)
+      window.toggleTOC = function(headerElement) {
+        var tocList = document.getElementById('toc-list');
+        var toggleIcon = headerElement.querySelector('.toc-toggle-icon');
+        
+        if (tocList && toggleIcon) {
+          if (tocList.style.display === 'none') {
+            tocList.style.display = 'block';
+            toggleIcon.classList.add('expanded');
+            toggleIcon.textContent = '▼';
+          } else {
+            tocList.style.display = 'none';
+            toggleIcon.classList.remove('expanded');
+            toggleIcon.textContent = '▶';
+          }
+        }
+      };
+      
+      // Smooth scroll enhancement (if not already set in CSS)
+      document.addEventListener('click', function(e) {
+        if (e.target.tagName === 'A' && e.target.getAttribute('href').startsWith('#toc-')) {
+          e.preventDefault();
+          var targetId = e.target.getAttribute('href').substring(1);
+          var targetElement = document.getElementById(targetId);
+          
+          if (targetElement) {
+            targetElement.scrollIntoView({
+              behavior: 'smooth',
+              block: 'start'
+            });
+            
+            // Update URL without scrolling
+            if (history.pushState) {
+              history.pushState(null, null, '#' + targetId);
+            }
+          }
+        }
+      });
+      
+    })();
+    //]]>
+    </script>
+    </b:if>
 
     <b:include data='blog' name='google-analytics'/>
   </body>

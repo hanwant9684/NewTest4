@@ -6,6 +6,13 @@ from dataclasses import dataclass, field
 from enum import IntEnum
 from logger import LOGGER
 
+try:
+    from database_sqlite import db
+except ImportError:
+    from database import db
+
+from config import PyroConf
+
 class Priority(IntEnum):
     PREMIUM = 1
     FREE = 2
@@ -29,6 +36,9 @@ class DownloadQueueManager:
         
         self.user_queue_positions: Dict[int, QueueItem] = {}
         self.active_tasks: Dict[int, asyncio.Task] = {}
+        
+        # Track when users can download again (user_id -> timestamp)
+        self.user_cooldowns: Dict[int, float] = {}
         
         self._lock = asyncio.Lock()
         self._processing = False
@@ -61,6 +71,27 @@ class DownloadQueueManager:
         is_premium: bool = False
     ) -> Tuple[bool, str]:
         async with self._lock:
+            # Check if user is in cooldown period
+            if user_id in self.user_cooldowns:
+                current_time = datetime.now().timestamp()
+                can_download_at = self.user_cooldowns[user_id]
+                
+                if current_time < can_download_at:
+                    remaining = int(can_download_at - current_time)
+                    minutes = remaining // 60
+                    seconds = remaining % 60
+                    
+                    tier_name = "👑 **PREMIUM**" if is_premium else "🆓 **FREE**"
+                    time_str = f"{minutes}m {seconds}s" if minutes > 0 else f"{seconds}s"
+                    
+                    return False, (
+                        f"⏰ **Download Cooldown Active!**\n\n"
+                        f"{tier_name} user\n"
+                        f"⏳ **Wait:** {time_str}\n\n"
+                        f"💡 You can download again after the cooldown ends.\n"
+                        f"This prevents server overload and ensures quality service for everyone!"
+                    )
+            
             if user_id in self.user_queue_positions or user_id in self.active_downloads:
                 position = self.get_queue_position(user_id)
                 if user_id in self.active_downloads:
@@ -170,6 +201,22 @@ class DownloadQueueManager:
             # Force garbage collection to free memory immediately after download
             gc.collect()
             LOGGER(__name__).info(f"Download completed for user {user_id}. Active: {len(self.active_downloads)}. GC triggered.")
+            
+            # Set cooldown for next download based on user tier
+            try:
+                user_type = db.get_user_type(user_id)
+                is_premium = user_type in ['paid', 'admin']
+                delay = PyroConf.PREMIUM_DOWNLOAD_DELAY if is_premium else PyroConf.FREE_DOWNLOAD_DELAY
+                
+                # Set when user can download again
+                async with self._lock:
+                    self.user_cooldowns[user_id] = datetime.now().timestamp() + delay
+                
+                LOGGER(__name__).info(
+                    f"Download cooldown set for user {user_id} ({user_type}): {delay}s until next download allowed"
+                )
+            except Exception as e:
+                LOGGER(__name__).warning(f"Could not set download cooldown for user {user_id}: {e}")
     
     async def _process_queue(self):
         while self._processing:

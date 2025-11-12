@@ -288,6 +288,10 @@ class DatabaseManager:
                 success = cursor.rowcount > 0
                 conn.commit()
                 conn.close()
+            
+            # Clear cache so next get_user_type call fetches fresh data
+            self.cache.delete(f"user_{user_id}")
+            
             return success
         except Exception as e:
             LOGGER(__name__).error(f"Error setting user type for {user_id}: {e}")
@@ -323,6 +327,9 @@ class DatabaseManager:
                 success = cursor.rowcount > 0
                 conn.commit()
                 conn.close()
+            
+            # Clear cache so next get_user_type call fetches fresh data
+            self.cache.delete(f"user_{user_id}")
             
             if success:
                 try:
