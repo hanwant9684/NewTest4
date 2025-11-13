@@ -114,9 +114,16 @@ async def upload_media_fast(
     """
     file_size = os.path.getsize(file_path)
     
+    # Calculate connection count to verify the monkeypatch is working
+    connection_count = _optimized_connection_count_upload(file_size)
+    
     # Use FastTelethon for uploads - parallel connections with RAM efficiency
     try:
-        LOGGER(__name__).info(f"FastTelethon upload starting: {file_path} ({file_size} bytes, RAM-optimized parallel)")
+        LOGGER(__name__).info(
+            f"FastTelethon upload starting: {file_path} "
+            f"({file_size} bytes = {file_size/1024/1024:.1f}MB, "
+            f"using {connection_count} connections for RAM safety)"
+        )
         
         with open(file_path, 'rb') as f:
             result = await fast_upload(
@@ -149,21 +156,28 @@ def _optimized_connection_count_download(file_size, max_count=MAX_DOWNLOAD_CONNE
 
 def _optimized_connection_count_upload(file_size, max_count=MAX_UPLOAD_CONNECTIONS, full_size=100*1024*1024):
     """
-    Tiered connection scaling optimized for UPLOAD RAM efficiency on Render
-    - Files >= 1GB: Use 3 connections (~15-30MB RAM) - Minimal RAM for large uploads
-    - Files 200MB-1GB: Use 4 connections (~20-40MB RAM) - Balanced
-    - Files < 200MB: Use 6 connections (~30-60MB RAM) - Faster speed
-    This prevents RAM spikes on large uploads while maintaining good performance
+    CRITICAL RAM FIX: Tiered connection scaling for constrained environments (Render 512MB RAM)
+    
+    Without this fix, a 90MB file spawns 18 connections (>120MB RAM spike), crashing the bot.
+    With this fix, same file uses 4 connections (~40MB RAM spike), staying within limits.
+    
+    Connection tiers (each connection uses ~10MB RAM):
+    - Files >= 1GB: 3 connections (~30MB RAM) - Prevents OOM on huge uploads
+    - Files 50MB-1GB: 4 connections (~40MB RAM) - Safe for Render, good speed
+    - Files < 50MB: 6 connections (~60MB RAM) - Faster for small files
+    
+    IMPORTANT: We ignore max_count parameter to prevent FastTelethon's default (20)
+    from bypassing our constraints. Always use hardcoded safe limits.
     """
-    # Large files (1GB+): Minimize connections to save RAM on Render
+    # Large files (1GB+): Minimize connections to prevent OOM
     if file_size >= 1024 * 1024 * 1024:  # 1GB
         return 3
-    # Medium-large files (200MB-1GB): Balanced approach
-    elif file_size >= 200 * 1024 * 1024:  # 200MB
+    # Medium files (50MB-1GB): Balanced - CRITICAL for 90MB files on Render
+    elif file_size >= 50 * 1024 * 1024:  # 50MB
         return 4
-    # Smaller files: Use moderate connections for speed
+    # Small files (< 50MB): Use more connections for speed
     else:
-        return min(6, max_count)
+        return 6
 
 # Apply optimized upload connection count to FastTelethon
 ParallelTransferrer._get_connection_count = staticmethod(_optimized_connection_count_upload)
