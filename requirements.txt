@@ -4,3 +4,4 @@ psutil
 uvloop
 waitress
 orjson
+ffmpeg

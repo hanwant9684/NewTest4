@@ -4,7 +4,7 @@ expertMode = true
 
 [nix]
 channel = "stable-25_05"
-packages = ["cargo", "libiconv", "libuv", "openssl", "rustc"]
+packages = ["cargo", "libiconv", "libuv", "openssl", "rustc", "ffmpeg"]
 
 [workflows]
 runButton = "Project"

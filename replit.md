@@ -37,6 +37,14 @@ None specified yet. Add preferences as they are expressed.
 
 4.  **System Stability & Optimization:**
     *   **RAM Optimization:** Implemented comprehensive memory optimizations including tiered connection scaling, asynchronous background tasks (using `asyncio.create_task`), and optimized data structures for memory monitoring.
+    *   **CRITICAL: Upload Connection Limiting (Nov 13, 2025):** Fixed critical memory leak that caused crashes on Render (512MB RAM) during 90MB file uploads:
+        *   **Problem:** FastTelethon was spawning 18 parallel upload connections for 90MB files, causing >120MB RAM spike at upload start, exhausting available memory and crashing the bot.
+        *   **Solution:** Monkeypatched `ParallelTransferrer._get_connection_count()` in `helpers/transfer.py` to enforce strict limits:
+            *   Files ≥1GB: 3 connections (~30MB RAM) - Prevents OOM on huge uploads
+            *   Files 50MB-1GB: 4 connections (~40MB RAM) - Safe for Render, includes 90MB case
+            *   Files <50MB: 6 connections (~60MB RAM) - Faster for small files
+        *   **Impact:** 90MB files now use 4 connections (~40MB RAM) instead of 18 (~120MB), preventing crashes while maintaining good upload speed.
+        *   **Logging:** Connection count is logged during upload to verify the fix is active.
     *   **Tier-Based File Cleanup (Nov 2025):** Smart cleanup system that waits before deleting files to ensure proper cache/chunk clearing:
         *   **Premium Users:** 2-second wait for optimal performance
         *   **Free Users:** 5-second wait to ensure complete cache/chunk cleanup on constrained environments
