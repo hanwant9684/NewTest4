@@ -165,7 +165,7 @@ class DownloadQueueManager:
             
             # Properly await the coroutine with timeout to prevent hanging
             try:
-                await asyncio.wait_for(download_coro, timeout=1800)  # 30 minute timeout
+                await asyncio.wait_for(download_coro, timeout=2700)  # 45 minute timeout
             except asyncio.TimeoutError:
                 LOGGER(__name__).error(f"Download timeout for user {user_id} after 30 minutes")
                 try:
