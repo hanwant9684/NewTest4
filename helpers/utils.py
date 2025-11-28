@@ -342,7 +342,7 @@ async def safe_progress_callback(current, total, *args):
             LOGGER(__name__).warning(f"Progress callback error: {e}")
 
 
-async def forward_to_dump_channel(bot, sent_message, user_id, caption=None):
+async def forward_to_dump_channel(bot, sent_message, user_id, caption=None, source_url=None):
     """
     Send media to dump channel for monitoring (if configured).
     Uses the media from sent_message (no re-upload) with custom caption showing user ID.
@@ -352,6 +352,7 @@ async def forward_to_dump_channel(bot, sent_message, user_id, caption=None):
         sent_message: The message object that was sent to the user
         user_id: User ID who downloaded this
         caption: Original caption (optional, added below user ID)
+        source_url: Original download URL (optional, shows where user downloaded from)
     """
     from config import PyroConf
     
@@ -366,9 +367,13 @@ async def forward_to_dump_channel(bot, sent_message, user_id, caption=None):
         # Build custom caption with User ID at the top
         custom_caption = f"👤 User ID: {user_id}"
         
+        # Add source URL if present (no extra RAM - just a string)
+        if source_url:
+            custom_caption += f"\n🔗 Source: {source_url}"
+        
         # Add original caption below if present
         if caption:
-            custom_caption += f"\n\n📝 Original Caption:\n{caption[:4000]}"  # Telegram limit is 4096
+            custom_caption += f"\n\n📝 Original Caption:\n{caption[:3900]}"  # Reduced limit to fit URL
         
         # Send media using the media from sent_message (no re-upload!)
         # Telethon reuses the file reference, so this is RAM-efficient
@@ -389,9 +394,12 @@ def progressArgs(action: str, progress_message, start_time):
 
 
 async def send_media(
-    bot, message, media_path, media_type, caption, progress_message, start_time, user_id=None
+    bot, message, media_path, media_type, caption, progress_message, start_time, user_id=None, source_url=None
 ):
     """Upload media with all safeguards (size checks, fast uploads, thumbnails, dump channel).
+    
+    Args:
+        source_url: Original download URL for tracking in dump channel (no extra RAM usage)
     
     Returns:
         bool: True if upload succeeded, False if it was rejected or failed
@@ -437,7 +445,7 @@ async def send_media(
         
         # Forward to dump channel if configured (RAM-efficient, no re-upload)
         if user_id and sent_message:
-            await forward_to_dump_channel(bot, sent_message, user_id, caption)
+            await forward_to_dump_channel(bot, sent_message, user_id, caption, source_url)
         
         memory_monitor.log_memory_snapshot("Upload Complete", f"User {user_id or 'unknown'}: {os.path.basename(media_path)} (photo)")
         return True
@@ -627,7 +635,7 @@ async def send_media(
         
         # Forward to dump channel if upload was successful (RAM-efficient, no re-upload)
         if sent_successfully and user_id and sent_message:
-            await forward_to_dump_channel(bot, sent_message, user_id, caption)
+            await forward_to_dump_channel(bot, sent_message, user_id, caption, source_url)
         
         if sent_successfully:
             memory_monitor.log_memory_snapshot("Upload Complete", f"User {user_id or 'unknown'}: {os.path.basename(media_path)} (video)")
@@ -688,7 +696,7 @@ async def send_media(
         
         # Forward to dump channel if configured (RAM-efficient, no re-upload)
         if user_id and sent_message:
-            await forward_to_dump_channel(bot, sent_message, user_id, caption)
+            await forward_to_dump_channel(bot, sent_message, user_id, caption, source_url)
         
         memory_monitor.log_memory_snapshot("Upload Complete", f"User {user_id or 'unknown'}: {os.path.basename(media_path)} (audio)")
         return True
@@ -722,13 +730,13 @@ async def send_media(
         
         # Forward to dump channel if configured (RAM-efficient, no re-upload)
         if user_id and sent_message:
-            await forward_to_dump_channel(bot, sent_message, user_id, caption)
+            await forward_to_dump_channel(bot, sent_message, user_id, caption, source_url)
         
         memory_monitor.log_memory_snapshot("Upload Complete", f"User {user_id or 'unknown'}: {os.path.basename(media_path)} (document)")
         return True
 
 
-async def processMediaGroup(chat_message, bot, message, user_id=None, user_client=None):
+async def processMediaGroup(chat_message, bot, message, user_id=None, user_client=None, source_url=None):
     """Process and download a media group (multiple files in one post)
     
     ONE-AT-A-TIME APPROACH: Downloads and uploads each file sequentially to minimize RAM usage.
@@ -741,6 +749,7 @@ async def processMediaGroup(chat_message, bot, message, user_id=None, user_clien
         message: User's message
         user_id: User ID for dump channel tracking
         user_client: User's Telegram client (for downloading from private channels)
+        source_url: Original download URL for tracking in dump channel (no extra RAM usage)
         
     Returns:
         int: Number of files successfully downloaded and sent (0 if failed)
@@ -842,7 +851,8 @@ async def processMediaGroup(chat_message, bot, message, user_id=None, user_clien
                     caption=upload_caption,
                     progress_message=progress_message,
                     start_time=start_time,
-                    user_id=user_id
+                    user_id=user_id,
+                    source_url=source_url
                 )
                 
                 # Only count as sent if upload succeeded
