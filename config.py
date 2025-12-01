@@ -63,7 +63,7 @@ class PyroConf:
     try:
         PREMIUM_DOWNLOAD_DELAY = int(os.getenv("PREMIUM_DOWNLOAD_DELAY", "5"))
     except ValueError:
-        PREMIUM_DOWNLOAD_DELAY = 5
+        PREMIUM_DOWNLOAD_DELAY = 10
     
     try:
         FREE_DOWNLOAD_DELAY = int(os.getenv("FREE_DOWNLOAD_DELAY", "15"))
@@ -78,12 +78,12 @@ class PyroConf:
     try:
         PREMIUM_INTRA_DELAY = int(os.getenv("PREMIUM_INTRA_DELAY", "1"))
     except ValueError:
-        PREMIUM_INTRA_DELAY = 1
+        PREMIUM_INTRA_DELAY = 10
     
     try:
         FREE_INTRA_DELAY = int(os.getenv("FREE_INTRA_DELAY", "3"))
     except ValueError:
-        FREE_INTRA_DELAY = 3
+        FREE_INTRA_DELAY = 15
     
     @staticmethod
     def get_app_url() -> str:
