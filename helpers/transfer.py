@@ -36,12 +36,8 @@ IS_CONSTRAINED = bool(
     os.getenv('REPL_ID')
 )
 
-# Tiered connection scaling for RAM optimization
+# Tiered connection scaling for RAM optimization (uploads only - downloads use streaming)
 # Each connection uses ~5-10MB RAM
-# For 1GB+ files: Use only 4 connections to minimize RAM (~20-40MB vs 60-160MB)
-# For 200MB-1GB: Use 6 connections for balance (~30-60MB)
-# For <200MB: Use 8 connections for speed (~40-80MB)
-MAX_DOWNLOAD_CONNECTIONS = 8 if IS_CONSTRAINED else 12
 MAX_UPLOAD_CONNECTIONS = 6 if IS_CONSTRAINED else 8
 
 async def download_media_fast(
@@ -138,21 +134,6 @@ async def upload_media_fast(
     except Exception as e:
         LOGGER(__name__).error(f"FastTelethon upload failed: {e}")
         return None
-
-def _optimized_connection_count_download(file_size, max_count=MAX_DOWNLOAD_CONNECTIONS, full_size=100*1024*1024):
-    """
-    NOTE: This is kept for compatibility but NOT used with streaming downloads.
-    Streaming downloads use single connection for maximum RAM efficiency.
-    """
-    # Large files (1GB+): Minimize connections to save RAM
-    if file_size >= 1024 * 1024 * 1024:  # 1GB
-        return 4
-    # Medium-large files (200MB-1GB): Balanced approach
-    elif file_size >= 200 * 1024 * 1024:  # 200MB
-        return 6
-    # Smaller files: Use more connections for speed (still reasonable RAM)
-    else:
-        return min(8, max_count)
 
 def _optimized_connection_count_upload(file_size, max_count=MAX_UPLOAD_CONNECTIONS, full_size=100*1024*1024):
     """

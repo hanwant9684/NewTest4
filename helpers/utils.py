@@ -479,10 +479,7 @@ async def send_media(
         fallback_thumb = None
         
         if user_id:
-            try:
-                from database_sqlite import db
-            except ImportError:
-                from database import db
+            from database_sqlite import db
             custom_thumb_file_id = db.get_custom_thumbnail(user_id)
             if custom_thumb_file_id:
                 try:
@@ -855,7 +852,7 @@ async def processMediaGroup(chat_message, bot, message, user_id=None, user_clien
                         message=msg,
                         file=download_path,
                         progress_callback=lambda c, t: safe_progress_callback(
-                            c, t, *progressArgs(f"📥 Download {idx}/{total_files}", progress_message, start_time)
+                            c, t, *progressArgs(f"📥 Download {idx}/{total_files}", progress_message, file_start_time)
                         )
                     )
                     media_path = result_path  # Update with actual result
@@ -889,7 +886,7 @@ async def processMediaGroup(chat_message, bot, message, user_id=None, user_clien
                         media_type=media_type,
                         caption=upload_caption,
                         progress_message=progress_message,
-                        start_time=start_time,
+                        start_time=file_start_time,
                         user_id=user_id,
                         source_url=source_url
                     )
