@@ -798,6 +798,7 @@ async def download_range(event):
 
     downloaded = skipped = failed = 0
     access_error_shown = False
+    processed_media_groups = set()  # Track already-processed media group IDs to avoid duplicates
 
     for msg_id in range(start_id, end_id + 1):
         url = f"{prefix}/{msg_id}"
@@ -816,11 +817,24 @@ async def download_range(event):
                 skipped += 1
                 continue
 
+            # Check if this message belongs to a media group we already processed
+            current_grouped_id = getattr(chat_msg, 'grouped_id', None)
+            if current_grouped_id:
+                if current_grouped_id in processed_media_groups:
+                    LOGGER(__name__).info(f"Batch download: Message {msg_id} belongs to already-processed media group {current_grouped_id} - skipping")
+                    skipped += 1
+                    continue
+                LOGGER(__name__).info(f"Batch download: Processing new media group {current_grouped_id} starting from message {msg_id}")
+
             LOGGER(__name__).info(f"Batch download: Calling handle_download for message {msg_id}")
             task = track_task(handle_download(bot, event, url, client_to_use, False), event.sender_id)
             try:
                 await task
                 downloaded += 1
+                # Mark media group as processed AFTER successful download (not before)
+                if current_grouped_id:
+                    processed_media_groups.add(current_grouped_id)
+                    LOGGER(__name__).info(f"Batch download: Media group {current_grouped_id} marked as processed after successful download")
                 LOGGER(__name__).info(f"Batch download: Successfully downloaded message {msg_id} (total: {downloaded})")
                 # Increment usage count for batch downloads after success
                 db.increment_usage(event.sender_id)

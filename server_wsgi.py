@@ -1453,13 +1453,7 @@ start_bot_once()
 if __name__ == '__main__':
     from waitress import serve
     
-    # Detect Replit environment and use port 8000, otherwise use PORT env var or 5000
-    if os.getenv('REPLIT_DEV_DOMAIN') or os.getenv('REPL_ID'):
-        port = 8000
-        _logger.info("Detected Replit environment - using port 8000")
-    else:
-        port = int(os.environ.get('PORT', 5000))
-        _logger.info(f"Using port {port} for non-Replit environment")
-    
+    # Replit requires port 5000 for webview workflows
+    port = int(os.environ.get('PORT', 5000))
     _logger.info(f"Starting Waitress WSGI server on 0.0.0.0:{port} (minimal RAM mode)")
     serve(application, host='0.0.0.0', port=port, threads=4, channel_timeout=60)

@@ -5,6 +5,21 @@
     <meta content='width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes' name='viewport'/>
     <meta content='IE=edge' http-equiv='X-UA-Compatible'/>
     
+    <!-- Mobile Redirect Fix: Remove ?m=1 parameter for Search Console and SEO -->
+    <script type='text/javascript'>
+    //<![CDATA[
+    (function() {
+      var url = window.location.href;
+      if (url.indexOf('?m=1') !== -1 || url.indexOf('&m=1') !== -1) {
+        var cleanUrl = url.replace(/[\?&]m=1/g, '').replace(/\?$/, '').replace(/&$/, '').replace(/\?&/, '?');
+        if (cleanUrl !== url) {
+          window.location.replace(cleanUrl);
+        }
+      }
+    })();
+    //]]>
+    </script>
+    
     <b:if cond='data:view.isHomepage'>
       <title><data:blog.pageTitle/></title>
     <b:else/>

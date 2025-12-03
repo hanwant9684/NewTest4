@@ -1,4 +1,4 @@
-modules = ["python-3.12", "web"]
+modules = ["web", "python-3.11"]
 [agent]
 expertMode = true
 
@@ -23,20 +23,16 @@ name = "telegram-bot"
 author = "agent"
 
 [workflows.workflow.metadata]
-outputType = "console"
+outputType = "webview"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "python server_wsgi.py"
-waitForPort = 8000
+waitForPort = 5000
 
 [[ports]]
 localPort = 5000
 externalPort = 80
-
-[[ports]]
-localPort = 8000
-externalPort = 8000
 
 [[ports]]
 localPort = 33091
