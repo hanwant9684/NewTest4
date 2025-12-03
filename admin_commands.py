@@ -5,10 +5,7 @@ import asyncio
 from telethon import events
 from telethon_helpers import InlineKeyboardButton, InlineKeyboardMarkup, parse_command, get_command_args
 from access_control import admin_only, register_user
-try:
-    from database_sqlite import db
-except ImportError:
-    from database import db
+from database_sqlite import db
 from logger import LOGGER
 
 @admin_only

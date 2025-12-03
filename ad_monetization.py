@@ -2,10 +2,7 @@ import secrets
 from datetime import datetime, timedelta
 
 from logger import LOGGER
-try:
-    from database_sqlite import db
-except ImportError:
-    from database import db
+from database_sqlite import db
 
 PREMIUM_DOWNLOADS = 5
 SESSION_VALIDITY_MINUTES = 30

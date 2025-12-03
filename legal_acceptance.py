@@ -7,10 +7,7 @@ from functools import wraps
 from telethon_helpers import InlineKeyboardButton, InlineKeyboardMarkup
 from logger import LOGGER
 
-try:
-    from database_sqlite import db
-except ImportError:
-    from database import db
+from database_sqlite import db
 
 LEGAL_DIR = "legal"
 TERMS_FILE = os.path.join(LEGAL_DIR, "terms_and_conditions.txt")

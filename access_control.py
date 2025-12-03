@@ -6,10 +6,7 @@ from functools import wraps
 from telethon import events
 from telethon.errors import UserNotParticipantError, ChatAdminRequiredError, ChannelPrivateError
 from telethon_helpers import InlineKeyboardButton, InlineKeyboardMarkup
-try:
-    from database_sqlite import db
-except ImportError:
-    from database import db
+from database_sqlite import db
 from logger import LOGGER
 from config import PyroConf
 

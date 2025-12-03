@@ -6,10 +6,7 @@ from dataclasses import dataclass, field
 from enum import IntEnum
 from logger import LOGGER
 
-try:
-    from database_sqlite import db
-except ImportError:
-    from database import db
+from database_sqlite import db
 
 from config import PyroConf
 

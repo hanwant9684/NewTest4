@@ -106,10 +106,7 @@ class MemoryMonitor:
             active_downloads = 0
         
         try:
-            try:
-                from database_sqlite import db
-            except ImportError:
-                from database import db
+            from database_sqlite import db
             cached_items = len(db.cache.cache) if hasattr(db, 'cache') and hasattr(db.cache, 'cache') else 0
             ad_sessions = db.get_ad_sessions_count() if hasattr(db, 'get_ad_sessions_count') else 0
         except:
