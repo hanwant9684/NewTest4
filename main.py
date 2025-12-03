@@ -502,20 +502,25 @@ async def handle_download(bot_client, event, post_url: str, user_client=None, in
 
             filename = get_file_name(message_id, chat_message)
             download_path = get_download_path(event.id, filename)
+            # Set expected path BEFORE download - ensures cleanup works even if timeout during download
+            media_path = download_path
 
             memory_monitor.log_memory_snapshot("Download Start", f"User {event.sender_id}: {filename}")
             
-            media_path = await download_media_fast(
-                client_to_use,
-                chat_message,
-                download_path,
-                progress_callback=lambda c, t: safe_progress_callback(c, t, *progressArgs("📥 FastTelethon Download", progress_message, start_time))
-            )
+            async def process_single_file():
+                nonlocal media_path
+                
+                result_path = await download_media_fast(
+                    client_to_use,
+                    chat_message,
+                    download_path,
+                    progress_callback=lambda c, t: safe_progress_callback(c, t, *progressArgs("📥 FastTelethon Download", progress_message, start_time))
+                )
+                media_path = result_path  # Update with actual result
 
-            memory_monitor.log_memory_snapshot("Download Complete", f"User {event.sender_id}: {filename}")
-            LOGGER(__name__).info(f"Downloaded media: {media_path}")
+                memory_monitor.log_memory_snapshot("Download Complete", f"User {event.sender_id}: {filename}")
+                LOGGER(__name__).info(f"Downloaded media: {media_path}")
 
-            try:
                 media_type = (
                     "photo"
                     if chat_message.photo
@@ -536,21 +541,22 @@ async def handle_download(bot_client, event, post_url: str, user_client=None, in
                     event.sender_id,
                     source_url=post_url,
                 )
+                return True
 
-                # Cleanup throttle data for this progress message
+            try:
+                PER_FILE_TIMEOUT = 2700
+                await asyncio.wait_for(process_single_file(), timeout=PER_FILE_TIMEOUT)
+                
                 from helpers.utils import _progress_throttle
                 _progress_throttle.cleanup(progress_message.id)
                 
                 await progress_message.delete()
 
-                # Only increment usage after successful download
                 if increment_usage:
                     db.increment_usage(event.sender_id)
                     
-                    # Show completion message with buttons for all users
                     user_type = db.get_user_type(event.sender_id)
                     if user_type == 'free':
-                        # Get remaining downloads count
                         user = db.get_user(event.sender_id)
                         ad_downloads_left = user.get('ad_downloads', 0) if user else 0
                         
@@ -566,12 +572,16 @@ async def handle_download(bot_client, event, post_url: str, user_client=None, in
                             buttons=upgrade_markup.to_telethon()
                         )
                     else:
-                        # Send simple completion message for premium/admin users
                         await event.respond("✅ **Download complete**")
+            except asyncio.TimeoutError:
+                LOGGER(__name__).error(f"Single file download timeout for user {event.sender_id} after 45 minutes: {filename}")
+                try:
+                    await progress_message.edit("⏰ **Download timed out after 45 minutes.** File may be too large or connection is slow.")
+                except:
+                    pass
             finally:
-                # CRITICAL: Always cleanup downloaded file with tier-based wait time
-                # Premium: 2s wait | Free: 5s wait for proper cache/chunk clearing
-                await cleanup_download_delayed(media_path, event.sender_id, db)
+                if media_path:
+                    await cleanup_download_delayed(media_path, event.sender_id, db)
 
         elif chat_message.text or chat_message.message:
             await event.respond(parsed_text or parsed_caption)

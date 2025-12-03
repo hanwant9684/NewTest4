@@ -163,16 +163,11 @@ class DownloadQueueManager:
             from memory_monitor import memory_monitor
             memory_monitor.log_memory_snapshot("Download Started", f"User {user_id} | Active: {len(self.active_downloads)}")
             
-            # Properly await the coroutine with timeout to prevent hanging
+            # No job-level timeout - processMediaGroup has its own per-file 45-minute timeout
+            # Each file in a media group gets 45 minutes, regardless of how many files
+            # This allows media groups of any size to complete properly
             try:
-                await asyncio.wait_for(download_coro, timeout=2700)  # 45 minute timeout
-            except asyncio.TimeoutError:
-                LOGGER(__name__).error(f"Download timeout for user {user_id} after 30 minutes")
-                try:
-                    await message.reply("❌ **Download failed:** Timeout after 30 minutes")
-                except:
-                    pass
-                return
+                await download_coro
             except asyncio.CancelledError:
                 LOGGER(__name__).info(f"Download cancelled for user {user_id}")
                 raise  # Re-raise to properly handle cancellation
