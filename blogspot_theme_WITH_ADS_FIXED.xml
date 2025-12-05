@@ -5,10 +5,17 @@
     <meta content='width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes' name='viewport'/>
     <meta content='IE=edge' http-equiv='X-UA-Compatible'/>
     
-    <!-- Mobile Redirect Fix: Remove ?m=1 parameter for Search Console and SEO -->
+    <!-- Mobile Redirect Fix: Remove ?m=1 parameter for Search Console and SEO - Skips for Bots -->
     <script type='text/javascript'>
     //<![CDATA[
     (function() {
+      // Skip for search engine bots - they should see the canonical URL directly
+      var isBot = /googlebot|bingbot|yandex|baiduspider|duckduckbot|slurp|facebookexternalhit|twitterbot|rogerbot|linkedinbot|embedly|quora|showyoubot|outbrain|pinterest|applebot|semrushbot|ahrefsbot|mj12bot|dotbot|petalbot|bytespider|gptbot|claudebot|anthropic/i.test(navigator.userAgent);
+      
+      if (isBot) {
+        return;
+      }
+      
       var url = window.location.href;
       if (url.indexOf('?m=1') !== -1 || url.indexOf('&m=1') !== -1) {
         var cleanUrl = url.replace(/[\?&]m=1/g, '').replace(/\?$/, '').replace(/&$/, '').replace(/\?&/, '?');
@@ -47,16 +54,37 @@
       <link expr:href='data:blog.url.canonical' rel='canonical'/>
     </b:if>
     
+    <!-- Robots Meta Tag for SEO -->
+    <meta name='robots' content='index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1'/>
+    
     <!-- SEO Meta Tags -->
     <b:if cond='data:view.isPost'>
       <meta expr:content='data:post.title' property='og:title'/>
       <meta expr:content='data:post.url' property='og:url'/>
       <meta content='article' property='og:type'/>
+      <meta expr:content='data:blog.title' property='og:site_name'/>
+      <meta expr:content='data:blog.locale' property='og:locale'/>
       <b:if cond='data:post.featuredImage'>
         <meta expr:content='data:post.featuredImage' property='og:image'/>
+        <meta content='1200' property='og:image:width'/>
+        <meta content='630' property='og:image:height'/>
       </b:if>
       <meta expr:content='data:post.snippet' property='og:description'/>
+      <meta expr:content='data:post.dateIso8601' property='article:published_time'/>
+      <meta expr:content='data:post.lastUpdatedIso8601' property='article:modified_time'/>
+      <meta expr:content='data:post.author' property='article:author'/>
+      <b:if cond='data:post.labels'>
+        <b:loop values='data:post.labels' var='label'>
+          <meta expr:content='data:label.name' property='article:tag'/>
+        </b:loop>
+      </b:if>
       <meta content='summary_large_image' name='twitter:card'/>
+      <meta expr:content='data:post.title' name='twitter:title'/>
+      <meta expr:content='data:post.snippet' name='twitter:description'/>
+      <b:if cond='data:post.featuredImage'>
+        <meta expr:content='data:post.featuredImage' name='twitter:image'/>
+      </b:if>
+      <meta expr:content='data:post.url' name='twitter:url'/>
       <meta expr:content='data:post.author' name='author'/>
       <b:if cond='data:post.snippet'>
         <meta expr:content='data:post.snippet' name='description'/>
@@ -65,136 +93,162 @@
       <meta expr:content='data:blog.title' property='og:title'/>
       <meta expr:content='data:blog.homepageUrl' property='og:url'/>
       <meta content='website' property='og:type'/>
+      <meta expr:content='data:blog.title' property='og:site_name'/>
+      <meta expr:content='data:blog.locale' property='og:locale'/>
+      <meta content='summary_large_image' name='twitter:card'/>
+      <meta expr:content='data:blog.title' name='twitter:title'/>
       <b:if cond='data:blog.metaDescription'>
         <meta expr:content='data:blog.metaDescription' name='description'/>
+        <meta expr:content='data:blog.metaDescription' name='twitter:description'/>
+        <meta expr:content='data:blog.metaDescription' property='og:description'/>
       <b:else/>
         <meta expr:content='data:blog.title + &quot; - Your source for social media tips, tricks, and hacks that make life easy&quot;' name='description'/>
+        <meta expr:content='data:blog.title + &quot; - Your source for social media tips, tricks, and hacks that make life easy&quot;' name='twitter:description'/>
+        <meta expr:content='data:blog.title + &quot; - Your source for social media tips, tricks, and hacks that make life easy&quot;' property='og:description'/>
       </b:if>
     </b:if>
     
-    <!-- JSON-LD Structured Data for SEO - Using JavaScript for proper escaping -->
+    <!-- RSS/Atom Feed Links for Crawlers -->
+    <link expr:href='data:blog.homepageUrl + &quot;feeds/posts/default&quot;' rel='alternate' title='Atom Feed' type='application/atom+xml'/>
+    <link expr:href='data:blog.homepageUrl + &quot;feeds/posts/default?alt=rss&quot;' rel='alternate' title='RSS Feed' type='application/rss+xml'/>
+    <link expr:href='data:blog.homepageUrl + &quot;atom.xml?redirect=false&amp;start-index=1&amp;max-results=500&quot;' rel='alternate' title='Full Atom Feed' type='application/atom+xml'/>
+    
+    <!-- Sitemap References - All 3 for Complete Coverage -->
+    <link expr:href='data:blog.homepageUrl + &quot;sitemap.xml&quot;' rel='sitemap' title='Posts Sitemap' type='application/xml'/>
+    <link expr:href='data:blog.homepageUrl + &quot;sitemap-pages.xml&quot;' rel='sitemap' title='Pages Sitemap' type='application/xml'/>
+    
+    <!-- Pagination Links for SEO (prev/next) -->
+    <b:if cond='data:newerPageUrl'>
+      <link expr:href='data:newerPageUrl' rel='prev'/>
+    </b:if>
+    <b:if cond='data:olderPageUrl'>
+      <link expr:href='data:olderPageUrl' rel='next'/>
+    </b:if>
+    
+    <!-- Static JSON-LD Structured Data for SEO - Best Practice for Crawlers -->
     <b:if cond='data:view.isPost'>
-      <script type='text/javascript'>
-      //<![CDATA[
-      (function() {
-        var blogPosting = {
-          "@context": "https://schema.org",
-          "@type": "BlogPosting",
-          "headline": "<data:post.title.jsonEscaped/>",
-          "url": "<data:post.url.jsonEscaped/>",
-          "datePublished": "<data:post.dateIso8601/>",
-          "dateModified": "<data:post.lastUpdatedIso8601/>",
-          "author": {
-            "@type": "Person",
-            "name": "<data:post.author.jsonEscaped/>"
-          },
-          "publisher": {
-            "@type": "Organization",
-            "name": "<data:blog.title.jsonEscaped/>",
-            "logo": {
-              "@type": "ImageObject",
-              "url": "https://socialhub00.blogspot.com/favicon.ico"
-            }
-          },
-          <b:if cond='data:post.featuredImage'>
-          "image": "<data:post.featuredImage.jsonEscaped/>",
-          </b:if>
-          "description": "<data:post.snippet.jsonEscaped/>"
-        };
-        
-        var script = document.createElement('script');
-        script.type = 'application/ld+json';
-        script.text = JSON.stringify(blogPosting);
-        document.head.appendChild(script);
-      })();
-      //]]>
+      <!-- BlogPosting Schema - Static for reliable crawling -->
+      <script type='application/ld+json'>
+      {
+        "@context": "https://schema.org",
+        "@type": "BlogPosting",
+        "mainEntityOfPage": {
+          "@type": "WebPage",
+          "@id": "<data:post.url.canonical/>"
+        },
+        "headline": "<data:post.title.jsonEscaped/>",
+        "url": "<data:post.url.canonical/>",
+        "datePublished": "<data:post.dateIso8601/>",
+        "dateModified": "<data:post.lastUpdatedIso8601/>",
+        "author": {
+          "@type": "Person",
+          "name": "<data:post.author.jsonEscaped/>",
+          "url": "<data:blog.homepageUrl/>"
+        },
+        "publisher": {
+          "@type": "Organization",
+          "name": "<data:blog.title.jsonEscaped/>",
+          "url": "<data:blog.homepageUrl/>",
+          "logo": {
+            "@type": "ImageObject",
+            "url": "<data:blog.homepageUrl/>favicon.ico",
+            "width": 60,
+            "height": 60
+          }
+        },
+        <b:if cond='data:post.featuredImage'>
+        "image": {
+          "@type": "ImageObject",
+          "url": "<data:post.featuredImage/>",
+          "width": 1200,
+          "height": 630
+        },
+        </b:if>
+        "description": "<data:post.snippet.jsonEscaped/>",
+        "inLanguage": "<data:blog.locale/>",
+        "articleSection": "<b:if cond='data:post.labels'><b:loop values='data:post.labels limit 1' var='label'><data:label.name.jsonEscaped/></b:loop><b:else/>Blog</b:if>",
+        "isPartOf": {
+          "@type": "Blog",
+          "@id": "<data:blog.homepageUrl/>#blog",
+          "name": "<data:blog.title.jsonEscaped/>"
+        }
+      }
       </script>
       
-      <!-- BreadcrumbList Schema for SEO -->
-      <script type='text/javascript'>
-      //<![CDATA[
-      (function() {
-        var breadcrumb = {
-          "@context": "https://schema.org",
-          "@type": "BreadcrumbList",
-          "itemListElement": [
-            {
-              "@type": "ListItem",
-              "position": 1,
-              "name": "Home",
-              "item": "<data:blog.homepageUrl/>"
-            }
-            <b:if cond='data:post.labels'>
-            <b:loop values='data:post.labels limit 1' var='label'>
-            ,{
-              "@type": "ListItem",
-              "position": 2,
-              "name": "<data:label.name.jsonEscaped/>",
-              "item": "<data:label.url.jsonEscaped/>"
-            }
-            </b:loop>
-            </b:if>
-            ,{
-              "@type": "ListItem",
-              "position": <b:if cond='data:post.labels'>3<b:else/>2</b:if>,
-              "name": "<data:post.title.jsonEscaped/>",
-              "item": "<data:post.url.jsonEscaped/>"
-            }
-          ]
-        };
-        
-        var script = document.createElement('script');
-        script.type = 'application/ld+json';
-        script.text = JSON.stringify(breadcrumb);
-        document.head.appendChild(script);
-      })();
-      //]]>
+      <!-- BreadcrumbList Schema - Static for reliable crawling -->
+      <script type='application/ld+json'>
+      {
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          {
+            "@type": "ListItem",
+            "position": 1,
+            "name": "Home",
+            "item": "<data:blog.homepageUrl/>"
+          }
+          <b:if cond='data:post.labels'>
+          <b:loop values='data:post.labels limit 1' var='label'>
+          ,{
+            "@type": "ListItem",
+            "position": 2,
+            "name": "<data:label.name.jsonEscaped/>",
+            "item": "<data:label.url.canonical/>"
+          }
+          </b:loop>
+          ,{
+            "@type": "ListItem",
+            "position": 3,
+            "name": "<data:post.title.jsonEscaped/>",
+            "item": "<data:post.url.canonical/>"
+          }
+          <b:else/>
+          ,{
+            "@type": "ListItem",
+            "position": 2,
+            "name": "<data:post.title.jsonEscaped/>",
+            "item": "<data:post.url.canonical/>"
+          }
+          </b:if>
+        ]
+      }
       </script>
     </b:if>
     
-    <!-- Organization Schema -->
-    <script type='text/javascript'>
-    //<![CDATA[
-    (function() {
-      var organization = {
-        "@context": "https://schema.org",
-        "@type": "Organization",
-        "name": "<data:blog.title.jsonEscaped/>",
-        "url": "<data:blog.homepageUrl/>",
-        "logo": "https://socialhub00.blogspot.com/favicon.ico",
-        "sameAs": []
-      };
-      
-      var script = document.createElement('script');
-      script.type = 'application/ld+json';
-      script.text = JSON.stringify(organization);
-      document.head.appendChild(script);
-    })();
-    //]]>
+    <!-- Organization Schema - Static for reliable crawling -->
+    <script type='application/ld+json'>
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      "name": "<data:blog.title.jsonEscaped/>",
+      "url": "<data:blog.homepageUrl/>",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "<data:blog.homepageUrl/>favicon.ico",
+        "width": 60,
+        "height": 60
+      },
+      "sameAs": []
+    }
     </script>
     
-    <!-- WebSite Schema with Search -->
-    <script type='text/javascript'>
-    //<![CDATA[
-    (function() {
-      var website = {
-        "@context": "https://schema.org",
-        "@type": "WebSite",
-        "name": "<data:blog.title.jsonEscaped/>",
-        "url": "<data:blog.homepageUrl/>",
-        "potentialAction": {
-          "@type": "SearchAction",
-          "target": "<data:blog.homepageUrl/>search?q={search_term_string}",
-          "query-input": "required name=search_term_string"
-        }
-      };
-      
-      var script = document.createElement('script');
-      script.type = 'application/ld+json';
-      script.text = JSON.stringify(website);
-      document.head.appendChild(script);
-    })();
-    //]]>
+    <!-- WebSite Schema with Search - Static for reliable crawling -->
+    <script type='application/ld+json'>
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "name": "<data:blog.title.jsonEscaped/>",
+      "url": "<data:blog.homepageUrl/>",
+      "inLanguage": "<data:blog.locale/>",
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": {
+          "@type": "EntryPoint",
+          "urlTemplate": "<data:blog.homepageUrl/>search?q={search_term_string}"
+        },
+        "query-input": "required name=search_term_string"
+      }
+    }
     </script>
 
     <b:skin version='1.3.3'><![CDATA[
@@ -1605,7 +1659,7 @@ h2[id], h3[id] {
 
 ]]></b:skin>
     
-    <!-- AdBlock Detection and Blocker Script -->
+    <!-- AdBlock Detection and Blocker Script - Skips for Search Engine Bots -->
     <style>
       #adblock-modal {
         display: none;
@@ -1722,6 +1776,12 @@ h2[id], h3[id] {
     <script type='text/javascript'>
     //<![CDATA[
     (function() {
+      var isBot = /googlebot|bingbot|yandex|baiduspider|duckduckbot|slurp|facebookexternalhit|twitterbot|rogerbot|linkedinbot|embedly|quora|showyoubot|outbrain|pinterest|applebot|semrushbot|ahrefsbot|mj12bot|dotbot|petalbot|bytespider|gptbot|claudebot|anthropic/i.test(navigator.userAgent);
+      
+      if (isBot) {
+        return;
+      }
+      
       var adBlockDetected = false;
       
       function detectAdBlock() {
@@ -1823,9 +1883,9 @@ h2[id], h3[id] {
           </button>
           <ul class='nav-submenu' id='submenu-categories' role='menu' aria-label='Categories'>
             <li role='none'><a href='/search/label/Telegram' role='menuitem'>🤖 Telegram</a></li>
-            <li role='none'><a href='/search/labelInstagram' role='menuitem'>🎬 Instagram</a></li>
+            <li role='none'><a href='/search/label/Instagram' role='menuitem'>🎬 Instagram</a></li>
             <li role='none'><a href='/search/label/Youtube' role='menuitem'>▶️ Youtube</a></li>
-            <li role='none'><a href='/search/label/Vitamins' role='menuitem'>Vitamins</a></li>
+            <li role='none'><a href='/search/label/Vitamins' role='menuitem'>💊 Vitamins</a></li>
           </ul>
         </li>
         <li role='none'>
@@ -2113,10 +2173,10 @@ h2[id], h3[id] {
                 <b:includable id='nextprev'>
                   <div class='blog-pager' id='blog-pager'>
                     <b:if cond='data:newerPageUrl'>
-                      <a class='blog-pager-newer-link' expr:href='data:newerPageUrl' expr:title='data:newerPageTitle'>Newer Posts</a>
+                      <a class='blog-pager-newer-link' expr:href='data:newerPageUrl' expr:title='data:newerPageTitle' rel='prev'>Newer Posts</a>
                     </b:if>
                     <b:if cond='data:olderPageUrl'>
-                      <a class='blog-pager-older-link' expr:href='data:olderPageUrl' expr:title='data:olderPageTitle'>Older Posts</a>
+                      <a class='blog-pager-older-link' expr:href='data:olderPageUrl' expr:title='data:olderPageTitle' rel='next'>Older Posts</a>
                     </b:if>
                   </div>
                 </b:includable>
@@ -2259,7 +2319,7 @@ h2[id], h3[id] {
             <span style='color: rgba(255,255,255,0.5);'>|</span>
             <a href='https://socialhub00.blogspot.com/p/terms-conditions.html'>Terms&amp;Conditions</a>
             <span style='color: rgba(255,255,255,0.5);'>|</span>
-            <a href='https://socialhub00.blogspot.com/sitemap.xml'>Sitemap</a>
+            <a expr:href='data:blog.homepageUrl + &quot;sitemap.xml&quot;' rel='noopener' title='View XML Sitemap'>Sitemap</a>
           </div>
         </div>
         
@@ -2273,10 +2333,17 @@ h2[id], h3[id] {
     <!-- Adsterra Popunder - ASYNC with error handling -->
     <script async='async' defer='defer' type='text/javascript' src='//pl27986671.effectivegatecpm.com/c0/b0/15/c0b015cd341a99514c7c6e1d5ce12b99.js' onerror="console.error('[Ad] Popunder failed to load')"></script>
 
-    <!-- SOLID, PERMANENT AD VERIFICATION TIMER - Runs immediately -->
+    <!-- SOLID, PERMANENT AD VERIFICATION TIMER - Runs immediately, Skips for Bots -->
     <script type='text/javascript'>
 //<![CDATA[
 (function() {
+  // Skip for search engine bots to prevent crawling issues
+  var isBot = /googlebot|bingbot|yandex|baiduspider|duckduckbot|slurp|facebookexternalhit|twitterbot|rogerbot|linkedinbot|embedly|quora|showyoubot|outbrain|pinterest|applebot|semrushbot|ahrefsbot|mj12bot|dotbot|petalbot|bytespider|gptbot|claudebot|anthropic/i.test(navigator.userAgent);
+  
+  if (isBot) {
+    return;
+  }
+  
   // Run immediately, no waiting for DOM
   var verificationPages = [
     '/2025/11/building-your-first-gpt-powered.html',
