@@ -277,7 +277,7 @@ async def help_command(event):
             "   `/dl <link>` or just paste a link\n"
             "   📺 Videos • 🖼️ Photos • 🎵 Audio • 📄 Documents\n\n"
             "⚠️ **Your Limits:**\n"
-            "   📊 1 download per day\n"
+            "   📊 5 download per day\n"
             "   ⏳ Normal queue priority\n"
             "   ❌ No batch downloads\n\n"
             "━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
