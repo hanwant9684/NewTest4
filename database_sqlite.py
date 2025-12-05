@@ -393,8 +393,8 @@ class DatabaseManager:
                     return False
             
             daily_usage = self.get_daily_usage(user_id)
-            if daily_usage + count > 1:
-                LOGGER(__name__).warning(f"User {user_id} tried to exceed daily limit: {daily_usage} + {count} > 1")
+            if daily_usage + count > 5:
+                LOGGER(__name__).warning(f"User {user_id} tried to exceed daily limit: {daily_usage} + {count} > 5")
                 return False
             
             date = datetime.now().strftime('%Y-%m-%d')
@@ -430,7 +430,7 @@ class DatabaseManager:
             return True, ""
 
         daily_usage = self.get_daily_usage(user_id)
-        if daily_usage + count > 1:
+        if daily_usage + count > 5:
             quota_message = f"📊 **Daily limit reached**"
             return False, quota_message
 
