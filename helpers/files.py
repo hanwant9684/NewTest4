@@ -1,6 +1,7 @@
 # Copyright (C) @TheSmartBisnu
 
 import os
+import gc
 import glob
 import time
 from typing import Optional
@@ -42,6 +43,7 @@ def cleanup_download(path: str) -> None:
 async def cleanup_download_delayed(path: str, user_id: Optional[int], db) -> None:
     """
     Cleanup downloaded files immediately after upload completes.
+    Includes garbage collection to force RAM release for 512MB environments.
     The delay between downloads is now handled in the queue manager,
     not during cleanup.
     
@@ -71,7 +73,13 @@ async def cleanup_download_delayed(path: str, user_id: Optional[int], db) -> Non
         if os.path.isdir(folder) and not os.listdir(folder):
             os.rmdir(folder)
         
-        LOGGER(__name__).info(f"✅ Cleanup complete for {os.path.basename(path)}")
+        # Force garbage collection to release RAM (critical for 512MB limit)
+        gc.collect()
+        
+        # Yield to event loop to allow memory to be reclaimed
+        await asyncio.sleep(0.1)
+        
+        LOGGER(__name__).info(f"✅ Cleanup complete for {os.path.basename(path)} (RAM released)")
 
     except Exception as e:
         LOGGER(__name__).error(f"Cleanup failed for {path}: {e}")

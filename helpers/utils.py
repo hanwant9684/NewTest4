@@ -2,6 +2,7 @@
 # Telethon-compatible version
 
 import os
+import gc
 import asyncio
 from time import time
 from logger import LOGGER
@@ -921,20 +922,29 @@ async def processMediaGroup(chat_message, bot, message, user_id=None, user_clien
                     except:
                         pass
                 
-                # STEP 3: Delete the file with tier-based wait time to ensure proper cache/chunk clearing
+                # STEP 3: Delete the file and release RAM (critical for 512MB limit)
                 if media_path:
                     try:
                         from database_sqlite import db
                         await cleanup_download_delayed(media_path, user_id, db)
-                        LOGGER(__name__).info(f"Cleaned up file {idx}/{total_files}: {media_path}")
+                        LOGGER(__name__).info(f"Cleaned up file {idx}/{total_files}: {os.path.basename(media_path)}")
                     except Exception as cleanup_err:
                         LOGGER(__name__).warning(f"Failed to cleanup file {idx}/{total_files}: {cleanup_err}")
+                    finally:
+                        # Explicitly delete reference and force garbage collection
+                        del media_path
+                        media_path = None
+                        gc.collect()
                 
-                # STEP 4: Tier-aware cooldown between files (skip for last file)
+                # STEP 4: Tier-aware cooldown between files (same as single file downloads)
+                # This wait time prevents RAM spikes by allowing memory to be fully reclaimed
                 if idx < total_files:
                     delay = get_intra_request_delay(is_premium)
+                    LOGGER(__name__).info(f"⏳ Waiting {delay}s before next file (RAM cooldown, same as single files)")
                     await asyncio.sleep(delay)
-                    LOGGER(__name__).debug(f"Cooldown complete ({delay}s) before next file")
+                    # Extra gc after delay to ensure clean state
+                    gc.collect()
+                    LOGGER(__name__).debug(f"Cooldown complete ({delay}s) - ready for file {idx+1}/{total_files}")
                 
             except asyncio.CancelledError:
                 LOGGER(__name__).info(f"File {idx}/{total_files} processing cancelled")
@@ -944,22 +954,32 @@ async def processMediaGroup(chat_message, bot, message, user_id=None, user_clien
                         await cleanup_download_delayed(media_path, user_id, db)
                     except:
                         pass
+                    finally:
+                        del media_path
+                        media_path = None
+                        gc.collect()
                 raise
                 
             except Exception as e:
                 LOGGER(__name__).error(f"Error processing file {idx}/{total_files} from message {msg.id}: {e}")
-                # Clean up on error with tier-based wait time
+                # Clean up on error and release RAM
                 if media_path:
                     try:
                         from database_sqlite import db
                         await cleanup_download_delayed(media_path, user_id, db)
                     except:
                         pass
+                    finally:
+                        del media_path
+                        media_path = None
+                        gc.collect()
                 
-                # Apply tier-aware cooldown even on error (skip for last file)
+                # Apply tier-aware cooldown even on error (same as single files)
                 if idx < total_files:
                     delay = get_intra_request_delay(is_premium)
+                    LOGGER(__name__).info(f"⏳ Waiting {delay}s after error before next file")
                     await asyncio.sleep(delay)
+                    gc.collect()
                 
                 continue
 
