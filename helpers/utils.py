@@ -43,8 +43,8 @@ from helpers.msg import (
 
 from helpers.transfer import download_media_fast
 
-# Simplified progress bar template (reduced RAM usage)
-PROGRESS_BAR = "{percentage:.0f}% | {speed}/s"
+# Ultra-minimal progress template (near-zero RAM)
+# No string formatting needed - computed inline
 
 async def cmd_exec(cmd, shell=False):
     if shell:
@@ -256,18 +256,12 @@ async def safe_progress_callback(current, total, *args):
         # Import here to avoid circular dependency
         from helpers.files import get_readable_file_size, get_readable_time
         
-        # Format progress bar (simple and RAM-efficient)
-        filled_length = int(10 * current / total) if total > 0 else 0
-        bar = "▓" * filled_length + "░" * (10 - filled_length)
+        # Ultra-minimal modern progress (near-zero RAM - no string multiplication)
+        # Uses simple integer math only
+        pct = int(percentage)
         
-        # Build progress message
-        progress_text = (
-            f"{action}\n\n"
-            f"{bar} {percentage:.1f}%\n\n"
-            f"📊 {get_readable_file_size(current)} / {get_readable_file_size(total)}\n"
-            f"⚡ Speed: {get_readable_file_size(speed)}/s\n"
-            f"⏱️ ETA: {get_readable_time(int(eta))}"
-        )
+        # Compact modern format - minimal string operations
+        progress_text = f"**{action}** `{pct}%`\n{get_readable_file_size(current)}/{get_readable_file_size(total)} • {get_readable_file_size(speed)}/s • {get_readable_time(int(eta))}"
         
         # Try to update message
         await progress_message.edit(progress_text)
@@ -337,9 +331,9 @@ async def forward_to_dump_channel(bot, sent_message, user_id, caption=None, sour
         # Silently log errors - don't interrupt user's download
         LOGGER(__name__).warning(f"Failed to send to dump channel: {e}")
 
-# Generate progress bar for downloading/uploading
+# Generate progress args for downloading/uploading (minimal tuple - low RAM)
 def progressArgs(action: str, progress_message, start_time):
-    return (action, progress_message, start_time, PROGRESS_BAR, "▓", "░")
+    return (action, progress_message, start_time)
 
 
 async def send_media(
@@ -361,7 +355,7 @@ async def send_media(
     from memory_monitor import memory_monitor
     memory_monitor.log_memory_snapshot("Upload Start", f"User {user_id or 'unknown'}: {os.path.basename(media_path)} ({media_type})")
     
-    progress_args = progressArgs("📥 FastTelethon Upload", progress_message, start_time)
+    progress_args = progressArgs("📤 Uploading", progress_message, start_time)
     LOGGER(__name__).info(f"Uploading media: {media_path} ({media_type})")
 
     if media_type == "photo":
@@ -573,7 +567,7 @@ async def _process_single_media_file(
         message=msg,
         file=download_path,
         progress_callback=lambda c, t: safe_progress_callback(
-            c, t, *progressArgs(f"📥 Download {idx}/{total_files}", progress_message, file_start_time)
+            c, t, *progressArgs(f"📥 Downloading {idx}/{total_files}", progress_message, file_start_time)
         )
     )
     
