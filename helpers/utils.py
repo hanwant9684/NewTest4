@@ -256,12 +256,20 @@ async def safe_progress_callback(current, total, *args):
         # Import here to avoid circular dependency
         from helpers.files import get_readable_file_size, get_readable_time
         
-        # Ultra-minimal modern progress (near-zero RAM - no string multiplication)
-        # Uses simple integer math only
+        # RAM-efficient visual progress bar using string slicing (no multiplication)
+        # Pre-built 20-character templates - only ~40 bytes total
         pct = int(percentage)
+        filled_count = pct // 5  # 0-20 filled blocks
         
-        # Compact modern format - minimal string operations
-        progress_text = f"**{action}** `{pct}%`\n{get_readable_file_size(current)}/{get_readable_file_size(total)} • {get_readable_file_size(speed)}/s • {get_readable_time(int(eta))}"
+        # Pre-built full strings (sliced, not multiplied - minimal RAM)
+        FILLED_BAR = "████████████████████"  # 20 filled chars
+        EMPTY_BAR = "░░░░░░░░░░░░░░░░░░░░"   # 20 empty chars
+        
+        # Build progress bar by slicing pre-built strings
+        progress_bar = f"[{FILLED_BAR[:filled_count]}{EMPTY_BAR[:20-filled_count]}]"
+        
+        # Visual format with progress bar
+        progress_text = f"**{action}** `{pct}%`\n{progress_bar}\n{get_readable_file_size(current)}/{get_readable_file_size(total)} • {get_readable_file_size(speed)}/s • {get_readable_time(int(eta))}"
         
         # Try to update message
         await progress_message.edit(progress_text)
@@ -574,6 +582,11 @@ async def _process_single_media_file(
     if not result_path:
         LOGGER(__name__).warning(f"File {idx}/{total_files} download failed: no media path returned")
         return None, False
+    
+    # RAM OPTIMIZATION: Release download buffers before upload starts
+    # This ensures peak RAM usage is minimized by clearing download memory before allocating upload buffers
+    gc.collect()
+    LOGGER(__name__).debug(f"RAM released after download, before upload: file {idx}/{total_files}")
     
     # Determine media type from msg attributes
     media_type = (
