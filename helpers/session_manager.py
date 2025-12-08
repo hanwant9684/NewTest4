@@ -84,7 +84,7 @@ class SessionManager:
                         # Clear activity timestamp for evicted session
                         self.last_activity.pop(oldest_idle_user, None)
                         LOGGER(__name__).info(f"Disconnected oldest idle session: user {oldest_idle_user} (no active downloads)")
-                        memory_monitor.log_memory_snapshot("Session Disconnected", f"Freed idle session for user {oldest_idle_user}")
+                        memory_monitor.log_memory_snapshot("Session Disconnected", f"Freed idle session for user {oldest_idle_user}", silent=True)
                     except Exception as e:
                         LOGGER(__name__).error(f"Error disconnecting session {oldest_idle_user}: {e}")
                 else:
@@ -126,7 +126,7 @@ class SessionManager:
                 self.last_activity[user_id] = time()
                 LOGGER(__name__).info(f"Created new session for user {user_id} ({len(self.active_sessions)}/{self.max_sessions})")
                 
-                memory_monitor.log_memory_snapshot("Session Created", f"User {user_id} - Total sessions: {len(self.active_sessions)}")
+                memory_monitor.log_memory_snapshot("Session Created", f"User {user_id} - Total sessions: {len(self.active_sessions)}", silent=True)
                 
                 return (client, None)
                 
@@ -145,7 +145,7 @@ class SessionManager:
                     del self.active_sessions[user_id]
                     self.last_activity.pop(user_id, None)
                     LOGGER(__name__).info(f"Removed session for user {user_id}")
-                    memory_monitor.log_memory_snapshot("Session Removed", f"User {user_id}")
+                    memory_monitor.log_memory_snapshot("Session Removed", f"User {user_id}", silent=True)
                 except Exception as e:
                     LOGGER(__name__).error(f"Error removing session {user_id}: {e}")
     
@@ -204,7 +204,7 @@ class SessionManager:
                         del self.last_activity[user_id]
                         disconnected_count += 1
                         
-                        memory_monitor.log_memory_snapshot("Idle Session Cleanup", f"User {user_id} idle for {idle_minutes:.1f}min")
+                        LOGGER(__name__).info(f"Session cleaned up: User {user_id} was idle for {idle_minutes:.0f}min")
                     except Exception as e:
                         LOGGER(__name__).error(f"Error disconnecting idle session {user_id}: {e}")
                 else:

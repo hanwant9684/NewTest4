@@ -72,7 +72,7 @@ async def download_media_fast(
                 largest_size = max(photo_sizes, key=lambda s: s.size)
                 file_size = largest_size.size
         
-        LOGGER(__name__).info(f"Streaming download starting: {file} ({file_size} bytes, RAM-optimized)")
+        LOGGER(__name__).debug(f"Streaming download: {file} ({file_size} bytes)")
         
         # Use Telethon's native streaming download - minimal RAM usage
         # iter_download streams chunks without loading entire file into memory
@@ -90,7 +90,7 @@ async def download_media_fast(
                     if inspect.iscoroutine(result):
                         await result
         
-        LOGGER(__name__).info(f"Streaming download complete: {file}")
+        LOGGER(__name__).debug(f"Streaming download complete: {file}")
         return file
         
     except Exception as e:
@@ -123,11 +123,7 @@ async def upload_media_fast(
     result = None
     
     try:
-        LOGGER(__name__).info(
-            f"FastTelethon upload starting: {file_path} "
-            f"({file_size} bytes = {file_size/1024/1024:.1f}MB, "
-            f"using {connection_count} connections for RAM safety)"
-        )
+        LOGGER(__name__).debug(f"Upload starting: {file_path} ({file_size/1024/1024:.1f}MB)")
         
         file_handle = open(file_path, 'rb')
         result = await fast_upload(
@@ -136,7 +132,7 @@ async def upload_media_fast(
             progress_callback=progress_callback
         )
         
-        LOGGER(__name__).info(f"FastTelethon upload complete: {file_path}")
+        LOGGER(__name__).debug(f"Upload complete: {file_path}")
         return result
         
     except Exception as e:
