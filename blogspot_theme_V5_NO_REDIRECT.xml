@@ -125,94 +125,6 @@
     </b:if>
     
     <!-- Static JSON-LD Structured Data for SEO - Best Practice for Crawlers -->
-    <b:if cond='data:view.isPost'>
-      <!-- BlogPosting Schema - Static for reliable crawling -->
-      <script type='application/ld+json'>
-      {
-        "@context": "https://schema.org",
-        "@type": "BlogPosting",
-        "mainEntityOfPage": {
-          "@type": "WebPage",
-          "@id": "<data:post.url.canonical/>"
-        },
-        "headline": "<data:post.title.jsonEscaped/>",
-        "url": "<data:post.url.canonical/>",
-        "datePublished": "<data:post.dateIso8601/>",
-        "dateModified": "<data:post.lastUpdatedIso8601/>",
-        "author": {
-          "@type": "Person",
-          "name": "<data:post.author.jsonEscaped/>",
-          "url": "<data:blog.homepageUrl/>"
-        },
-        "publisher": {
-          "@type": "Organization",
-          "name": "<data:blog.title.jsonEscaped/>",
-          "url": "<data:blog.homepageUrl/>",
-          "logo": {
-            "@type": "ImageObject",
-            "url": "<data:blog.homepageUrl/>favicon.ico",
-            "width": 60,
-            "height": 60
-          }
-        },
-        <b:if cond='data:post.featuredImage'>
-        "image": {
-          "@type": "ImageObject",
-          "url": "<data:post.featuredImage/>",
-          "width": 1200,
-          "height": 630
-        },
-        </b:if>
-        "description": "<data:post.snippet.jsonEscaped/>",
-        "inLanguage": "<data:blog.locale/>",
-        "articleSection": "<b:if cond='data:post.labels'><b:loop values='data:post.labels limit 1' var='label'><data:label.name.jsonEscaped/></b:loop><b:else/>Blog</b:if>",
-        "isPartOf": {
-          "@type": "Blog",
-          "@id": "<data:blog.homepageUrl/>#blog",
-          "name": "<data:blog.title.jsonEscaped/>"
-        }
-      }
-      </script>
-      
-      <!-- BreadcrumbList Schema - Static for reliable crawling -->
-      <script type='application/ld+json'>
-      {
-        "@context": "https://schema.org",
-        "@type": "BreadcrumbList",
-        "itemListElement": [
-          {
-            "@type": "ListItem",
-            "position": 1,
-            "name": "Home",
-            "item": "<data:blog.homepageUrl/>"
-          }
-          <b:if cond='data:post.labels'>
-          <b:loop values='data:post.labels limit 1' var='label'>
-          ,{
-            "@type": "ListItem",
-            "position": 2,
-            "name": "<data:label.name.jsonEscaped/>",
-            "item": "<data:label.url.canonical/>"
-          }
-          </b:loop>
-          ,{
-            "@type": "ListItem",
-            "position": 3,
-            "name": "<data:post.title.jsonEscaped/>",
-            "item": "<data:post.url.canonical/>"
-          }
-          <b:else/>
-          ,{
-            "@type": "ListItem",
-            "position": 2,
-            "name": "<data:post.title.jsonEscaped/>",
-            "item": "<data:post.url.canonical/>"
-          }
-          </b:if>
-        ]
-      }
-      </script>
-    </b:if>
     
     <!-- Organization Schema - Static for reliable crawling -->
     <script type='application/ld+json'>
@@ -2227,7 +2139,7 @@ h2[id], h3[id] {
 //<![CDATA[
 (function() {
   try {
-    var isMobile = window.innerWidth < 768;
+    var isMobile = 768 > window.innerWidth;
     var scriptHtml = '';
     
     if (isMobile) {
@@ -2264,6 +2176,32 @@ h2[id], h3[id] {
                         </b:if>
                       </div>
                     </div>
+                    
+                    <b:if cond='data:view.isPost'>
+                      <!-- BlogPosting Schema Removed to fix Syntax Error -->
+                      
+                      <!-- BreadcrumbList Schema -->
+                      <script type='application/ld+json'>
+                      {
+                        "@context": "https://schema.org",
+                        "@type": "BreadcrumbList",
+                        "itemListElement": [
+                          {
+                            "@type": "ListItem",
+                            "position": 1,
+                            "name": "Home",
+                            "item": "<data:blog.homepageUrl/>"
+                          },
+                          {
+                            "@type": "ListItem",
+                            "position": 2,
+                            "name": "<data:post.title.jsonEscaped/>",
+                            "item": "<data:post.url.canonical/>"
+                          }
+                        ]
+                      }
+                      </script>
+                    </b:if>
 
                     <!-- END OF ARTICLE AD (After entire post, before comments) - Single post only - FIXED -->
                     <b:if cond='data:view.isSingleItem'>
@@ -2391,7 +2329,7 @@ h2[id], h3[id] {
 //<![CDATA[
 (function() {
   try {
-    var isMobile = window.innerWidth < 768;
+    var isMobile = 768 > window.innerWidth;
     var scriptHtml = '';
     
     if (isMobile) {
@@ -2602,7 +2540,7 @@ h2[id], h3[id] {
     
     <!-- Adsterra SmartBar (Sticky notification bar) - FIXED -->
     <script type='text/javascript'>
-<![CDATA[
+//<![CDATA[
 (function() {
   try {
     atOptions = {
@@ -2628,7 +2566,7 @@ h2[id], h3[id] {
     console.error('[Ad] SmartBar initialization error:', e);
   }
 })();
-]]>
+//]]>
 </script>
 
     <!-- Navigation Menu Controls with Keyboard Support -->
