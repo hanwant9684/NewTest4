@@ -43,59 +43,6 @@ from helpers.msg import (
 
 from helpers.transfer import download_media_fast
 
-# Try to import PIL for thumbnail processing (optional)
-try:
-    from PIL import Image as PILImage
-    PIL_AVAILABLE = True
-except ImportError:
-    PILImage = None
-    PIL_AVAILABLE = False
-    LOGGER(__name__).info("PIL not available - thumbnails will be skipped for better RAM efficiency")
-
-async def process_thumbnail(thumb_path, max_size_kb=200):
-    """
-    Process thumbnail to meet Telegram requirements (optional - requires PIL):
-    - JPEG format
-    - <= 200 KB
-    - Max 320px width/height
-    
-    Returns False if PIL is not available or processing fails.
-    """
-    if not PIL_AVAILABLE or PILImage is None:
-        return False
-    
-    try:
-        with PILImage.open(thumb_path) as img:
-            # Convert to RGB (remove alpha channel if present)
-            if img.mode != 'RGB':
-                img = img.convert('RGB')
-            
-            # Resize to fit within 320x320 while maintaining aspect ratio
-            img.thumbnail((320, 320), PILImage.Resampling.LANCZOS)
-            
-            # Save with compression, iteratively reduce quality if needed
-            quality = 95
-            while quality > 10:
-                img.save(thumb_path, 'JPEG', quality=quality, optimize=True)
-                
-                # Check file size
-                file_size_kb = os.path.getsize(thumb_path) / 1024
-                if file_size_kb <= max_size_kb:
-                    return True
-                
-                quality -= 10
-            
-            # If still too large after minimum quality, return False
-            file_size_kb = os.path.getsize(thumb_path) / 1024
-            if file_size_kb > max_size_kb:
-                LOGGER(__name__).warning(f"Thumbnail still {file_size_kb:.2f} KB after compression")
-                return False
-            
-            return True
-    except Exception as e:
-        LOGGER(__name__).error(f"Error processing thumbnail: {e}")
-        return False
-
 # Simplified progress bar template (reduced RAM usage)
 PROGRESS_BAR = "{percentage:.0f}% | {speed}/s"
 
@@ -173,28 +120,6 @@ async def get_media_info(path):
         
         return duration, artist, title
     return 0, None, None
-
-
-async def get_video_thumbnail(video_file, duration):
-    output = os.path.join("Assets", "video_thumb.jpg")
-    if duration is None:
-        duration = (await get_media_info(video_file))[0]
-    if not duration:
-        duration = 3
-    duration //= 2
-    cmd = [
-        "ffmpeg", "-hide_banner", "-loglevel", "error",
-        "-ss", str(duration), "-i", video_file,
-        "-vf", "thumbnail", "-q:v", "1", "-frames:v", "1",
-        "-threads", str((os.cpu_count() or 4) // 2), output,
-    ]
-    try:
-        _, err, code = await wait_for(cmd_exec(cmd), timeout=60)
-        if code != 0 or not os.path.exists(output):
-            return None
-    except:
-        return None
-    return output
 
 
 # Progress Throttle Helper to prevent Telegram API rate limits
@@ -474,76 +399,12 @@ async def send_media(
         memory_monitor.log_memory_snapshot("Upload Complete", f"User {user_id or 'unknown'}: {os.path.basename(media_path)} (photo)")
         return True
     elif media_type == "video":
-        # Check for custom thumbnail first
-        thumb = None
-        custom_thumb_path = None
-        fallback_thumb = None
-        
-        if user_id:
-            from database_sqlite import db
-            custom_thumb_file_id = db.get_custom_thumbnail(user_id)
-            if custom_thumb_file_id:
-                try:
-                    # Use unique temp path to avoid race conditions
-                    import time as time_module
-                    timestamp = int(time_module.time() * 1000)
-                    os.makedirs("Assets/thumbs", exist_ok=True)
-                    custom_thumb_path = f"Assets/thumbs/user_{user_id}_{timestamp}.jpg"
-                    
-                    # Download the thumbnail from Telegram
-                    await bot.download_media(custom_thumb_file_id, file=custom_thumb_path)
-                    
-                    # Process thumbnail to meet Telegram requirements
-                    if await process_thumbnail(custom_thumb_path):
-                        thumb = custom_thumb_path
-                        LOGGER(__name__).info(f"Using custom thumbnail for user {user_id}")
-                    else:
-                        LOGGER(__name__).warning(f"Failed to process custom thumbnail for user {user_id}, will try fallback")
-                        thumb = None
-                except Exception as e:
-                    LOGGER(__name__).error(f"Failed to download custom thumbnail for user {user_id}: {e}")
-                    thumb = None
-        
         # Get video duration and dimensions
         duration = (await get_media_info(media_path))[0]
         
-        # If no custom thumbnail, prepare unique fallback thumbnail
-        if not thumb:
-            import time as time_module
-            timestamp = int(time_module.time() * 1000)
-            os.makedirs("Assets/thumbs", exist_ok=True)
-            fallback_thumb = f"Assets/thumbs/fb_{user_id or 0}_{timestamp}.jpg"
-            
-            # Extract thumbnail from video to unique path
-            cmd = [
-                "ffmpeg", "-hide_banner", "-loglevel", "error",
-                "-ss", str(duration // 2 if duration else 3), "-i", media_path,
-                "-vf", "thumbnail", "-q:v", "1", "-frames:v", "1",
-                "-threads", str((os.cpu_count() or 4) // 2), fallback_thumb,
-            ]
-            try:
-                _, err, code = await wait_for(cmd_exec(cmd), timeout=60)
-                if code == 0 and os.path.exists(fallback_thumb):
-                    thumb = fallback_thumb
-                else:
-                    thumb = None
-            except:
-                thumb = None
-        
-        # Get video dimensions
-        if thumb and thumb != "none" and os.path.exists(str(thumb)) and PIL_AVAILABLE and PILImage:
-            try:
-                with PILImage.open(thumb) as img:
-                    width, height = img.size
-            except:
-                width = 480
-                height = 320
-        else:
-            width = 480
-            height = 320
-
-        if thumb == "none":
-            thumb = None
+        # Default video dimensions
+        width = 480
+        height = 320
 
         # Prepare video attributes
         attributes = []
@@ -555,7 +416,6 @@ async def send_media(
                 supports_streaming=True
             ))
         
-        sent_successfully = False
         sent_message = None
         try:
             from helpers.transfer import upload_media_fast
@@ -567,12 +427,10 @@ async def send_media(
             )
             
             if fast_file:
-                # FastTelethon upload: Use the file with explicit filename to preserve extension
                 sent_message = await bot.send_file(
                     message.chat_id,
                     fast_file,
                     caption=caption or "",
-                    thumb=thumb,
                     attributes=attributes if attributes else None,
                     force_document=False,
                     file_name=os.path.basename(media_path)
@@ -582,96 +440,19 @@ async def send_media(
                     message.chat_id,
                     media_path,
                     caption=caption or "",
-                    thumb=thumb,
                     attributes=attributes if attributes else None,
                     progress_callback=lambda c, t: safe_progress_callback(c, t, *progress_args),
                     force_document=False
                 )
-            sent_successfully = True
         except Exception as e:
-            # If thumbnail causes error, try with fallback or no thumb
-            LOGGER(__name__).error(f"Upload failed with thumbnail: {e}")
-            
-            # If custom thumbnail was used, generate fallback now
-            if custom_thumb_path and not fallback_thumb:
-                LOGGER(__name__).info("Custom thumbnail failed, generating fallback thumbnail")
-                try:
-                    import time as time_module
-                    timestamp = int(time_module.time() * 1000)
-                    fallback_thumb = f"Assets/thumbs/fb_{user_id or 0}_{timestamp}.jpg"
-                    
-                    cmd = [
-                        "ffmpeg", "-hide_banner", "-loglevel", "error",
-                        "-ss", str(duration // 2 if duration else 3), "-i", media_path,
-                        "-vf", "thumbnail", "-q:v", "1", "-frames:v", "1",
-                        "-threads", str((os.cpu_count() or 4) // 2), fallback_thumb,
-                    ]
-                    _, err, code = await wait_for(cmd_exec(cmd), timeout=60)
-                    if code != 0 or not os.path.exists(fallback_thumb):
-                        fallback_thumb = None
-                except:
-                    fallback_thumb = None
-            
-            # Try with fallback thumbnail
-            if fallback_thumb:
-                LOGGER(__name__).info("Retrying with auto-extracted thumbnail")
-                try:
-                    sent_message = await bot.send_file(
-                        message.chat_id,
-                        media_path,
-                        caption=caption or "",
-                        thumb=fallback_thumb,
-                        attributes=attributes if attributes else None,
-                        progress_callback=lambda c, t: safe_progress_callback(c, t, *progress_args),
-                        force_document=False
-                    )
-                    thumb = fallback_thumb
-                    sent_successfully = True
-                except Exception as e2:
-                    LOGGER(__name__).error(f"Upload failed with fallback: {e2}, trying without thumbnail")
-                    sent_message = await bot.send_file(
-                        message.chat_id,
-                        media_path,
-                        caption=caption or "",
-                        thumb=None,
-                        attributes=attributes if attributes else None,
-                        progress_callback=lambda c, t: safe_progress_callback(c, t, *progress_args),
-                        force_document=False
-                    )
-                    thumb = None
-                    sent_successfully = True
-            else:
-                LOGGER(__name__).info("Retrying without thumbnail")
-                sent_message = await bot.send_file(
-                    message.chat_id,
-                    media_path,
-                    caption=caption or "",
-                    thumb=None,
-                    attributes=attributes if attributes else None,
-                    progress_callback=lambda c, t: safe_progress_callback(c, t, *progress_args),
-                    force_document=False
-                )
-                thumb = None
-                sent_successfully = True
+            LOGGER(__name__).error(f"Upload failed: {e}")
+            raise
         
         # Forward to dump channel if upload was successful (RAM-efficient, no re-upload)
-        if sent_successfully and user_id and sent_message:
+        if user_id and sent_message:
             await forward_to_dump_channel(bot, sent_message, user_id, caption, source_url)
         
-        if sent_successfully:
-            memory_monitor.log_memory_snapshot("Upload Complete", f"User {user_id or 'unknown'}: {os.path.basename(media_path)} (video)")
-        
-        # Clean up thumbnails after upload
-        if custom_thumb_path and os.path.exists(custom_thumb_path):
-            try:
-                os.remove(custom_thumb_path)
-            except:
-                pass
-        if fallback_thumb and os.path.exists(fallback_thumb):
-            try:
-                os.remove(fallback_thumb)
-            except:
-                pass
+        memory_monitor.log_memory_snapshot("Upload Complete", f"User {user_id or 'unknown'}: {os.path.basename(media_path)} (video)")
         return True
     elif media_type == "audio":
         duration, artist, title = await get_media_info(media_path)
