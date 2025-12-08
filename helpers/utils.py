@@ -79,56 +79,41 @@ async def generate_thumbnail(video_path, thumb_path=None, duration=None):
     if thumb_path is None:
         thumb_path = video_path + ".thumb.jpg"
     
-    LOGGER(__name__).info(f"🎬 Generating thumbnail for: {video_path}")
-    LOGGER(__name__).info(f"📁 Thumbnail output path: {thumb_path}")
-    LOGGER(__name__).info(f"⏱️ Video duration: {duration}")
-    
     proc = None
     try:
         seek_time = 0
         if duration and duration > 1:
             seek_time = min(max(1, duration // 4), 5)
         
-        LOGGER(__name__).info(f"⏩ Seeking to {seek_time}s for thumbnail extraction")
-        
         cmd = [
-            "ffmpeg", "-y", "-ss", str(seek_time), "-i", video_path,
+            "ffmpeg", "-y", "-i", video_path, "-ss", str(seek_time),
             "-vframes", "1", "-vf", "scale=320:-1", "-q:v", "5", thumb_path
         ]
-        LOGGER(__name__).info(f"🔧 FFmpeg command: {' '.join(cmd)}")
         
         proc = await create_subprocess_exec(*cmd, stdout=PIPE, stderr=PIPE)
         
         try:
             stdout, stderr = await wait_for(proc.communicate(), timeout=10.0)
         except asyncio.TimeoutError:
-            LOGGER(__name__).warning(f"⏰ Thumbnail generation timed out after 10s - killing process")
+            LOGGER(__name__).warning(f"Thumbnail generation timed out - skipping")
             proc.kill()
             await proc.wait()
             return None
         
-        try:
-            stdout_str = stdout.decode().strip() if stdout else "empty"
-        except:
-            stdout_str = "Unable to decode"
-        try:
-            stderr_str = stderr.decode().strip() if stderr else "empty"
-        except:
-            stderr_str = "Unable to decode"
-        
-        LOGGER(__name__).info(f"📤 FFmpeg stdout: {stdout_str[:500]}")
-        LOGGER(__name__).info(f"📤 FFmpeg stderr: {stderr_str[:500]}")
-        LOGGER(__name__).info(f"📤 FFmpeg exit code: {proc.returncode}")
-        
         if proc.returncode == 0 and os.path.exists(thumb_path):
             thumb_size = os.path.getsize(thumb_path)
-            LOGGER(__name__).info(f"✅ Thumbnail generated successfully: {thumb_path} ({thumb_size} bytes)")
-            return thumb_path
+            if thumb_size > 0:
+                return thumb_path
+            else:
+                try:
+                    os.remove(thumb_path)
+                except:
+                    pass
+                return None
         else:
-            LOGGER(__name__).warning(f"❌ Thumbnail generation failed - exit code: {proc.returncode}, stderr: {stderr_str}")
             return None
     except Exception as e:
-        LOGGER(__name__).error(f"❌ Thumbnail generation error: {e}")
+        LOGGER(__name__).warning(f"Thumbnail generation failed: {e}")
         if proc and proc.returncode is None:
             try:
                 proc.kill()
