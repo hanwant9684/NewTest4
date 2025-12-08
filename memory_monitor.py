@@ -93,7 +93,7 @@ class MemoryMonitor:
     def get_detailed_state(self):
         try:
             from helpers.session_manager import session_manager
-            active_sessions = len(session_manager.sessions) if hasattr(session_manager, 'sessions') else 0
+            active_sessions = len(session_manager.active_sessions) if hasattr(session_manager, 'active_sessions') else 0
         except:
             active_sessions = 0
         
