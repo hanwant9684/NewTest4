@@ -638,10 +638,10 @@ async def download_media(event):
         )
         return
     
-    # Check if user is premium for queue priority
+    # Check if user is premium for cooldown settings
     is_premium = db.get_user_type(event.sender_id) in ['paid', 'admin']
     
-    # Add to download queue
+    # Start download (immediate start or reject if busy)
     download_coro = handle_download(bot, event, post_url, user_client, True)
     success, msg = await download_manager.start_download(
         event.sender_id,
@@ -1046,22 +1046,22 @@ async def cancel_command(event):
 @register_user
 async def cancel_download_command(event):
     """Cancel user's running downloads (including batch downloads)"""
-    queue_success, queue_msg = await download_manager.cancel_user_download(event.sender_id)
+    download_cancelled, cancel_msg = await download_manager.cancel_user_download(event.sender_id)
     
     batch_cancelled = cancel_user_tasks(event.sender_id)
     
-    if queue_success or batch_cancelled > 0:
-        total_cancelled = (1 if queue_success else 0) + batch_cancelled
+    if download_cancelled or batch_cancelled > 0:
+        total_cancelled = (1 if download_cancelled else 0) + batch_cancelled
         if batch_cancelled > 0:
             await event.respond(
                 f"✅ **Cancelled {total_cancelled} download(s)!**\n\n"
                 "This includes any running batch downloads."
             )
         else:
-            await event.respond(queue_msg)
-        LOGGER(__name__).info(f"User {event.sender_id} cancelled {total_cancelled} download(s) (queue: {queue_success}, batch: {batch_cancelled})")
+            await event.respond(cancel_msg)
+        LOGGER(__name__).info(f"User {event.sender_id} cancelled {total_cancelled} download(s) (active: {download_cancelled}, batch: {batch_cancelled})")
     else:
-        await event.respond(queue_msg)
+        await event.respond(cancel_msg)
 
 @bot.on(events.NewMessage(pattern='/status', incoming=True, func=lambda e: e.is_private))
 @register_user
@@ -1082,7 +1082,7 @@ async def server_status_command(event):
 @check_download_limit
 async def handle_any_message(event):
     if event.text and not event.text.startswith("/"):
-        # Check if user is premium for queue priority
+        # Check if user is premium for cooldown settings
         is_premium = db.get_user_type(event.sender_id) in ['paid', 'admin']
         
         # Check if user already has an active download (quick check before getting client)
@@ -1124,7 +1124,7 @@ async def handle_any_message(event):
             )
             return
         
-        # Add to download queue
+        # Start download (immediate start or reject if busy)
         download_coro = handle_download(bot, event, event.text, user_client, True)
         success, msg = await download_manager.start_download(
             event.sender_id,
@@ -1176,16 +1176,16 @@ async def logs(event):
 @bot.on(events.NewMessage(pattern='/killall', incoming=True, func=lambda e: e.is_private))
 @admin_only
 async def cancel_all_tasks(event):
-    queue_cancelled = await download_manager.cancel_all_downloads()
+    downloads_cancelled = await download_manager.cancel_all_downloads()
     task_cancelled = 0
     for task in list(RUNNING_TASKS):
         if not task.done():
             task.cancel()
             task_cancelled += 1
-    total_cancelled = queue_cancelled + task_cancelled
+    total_cancelled = downloads_cancelled + task_cancelled
     await event.respond(
         f"✅ **All downloads cancelled!**\n\n"
-        f"📊 **Active downloads:** {queue_cancelled}\n"
+        f"📊 **Active downloads:** {downloads_cancelled}\n"
         f"📊 **Other tasks:** {task_cancelled}\n"
         f"📊 **Total:** {total_cancelled}"
     )
