@@ -1,53 +1,33 @@
 import os
 import asyncio
 from datetime import datetime
-from typing import Dict, Set, Optional, Tuple
-from dataclasses import dataclass, field
-from enum import IntEnum
+from typing import Dict, Set, Optional, Tuple, Union
 from logger import LOGGER
 
 from database_sqlite import db
 
 from config import PyroConf
 
-class Priority(IntEnum):
-    PREMIUM = 1
-    FREE = 2
-
-@dataclass(order=True)
-class QueueItem:
-    priority: int
-    timestamp: float = field(compare=True)
-    user_id: int = field(compare=False)
-    download_coro: any = field(compare=False)
-    message: any = field(compare=False)
-    post_url: str = field(compare=False)
-
-class DownloadQueueManager:
-    def __init__(self, max_concurrent: int = 20, max_queue: int = 100):
+class DownloadManager:
+    """Simplified download manager without queue - just tracks active downloads"""
+    
+    def __init__(self, max_concurrent: int = 3):
         self.max_concurrent = max_concurrent
-        self.max_queue = max_queue
         
         self.active_downloads: Set[int] = set()
         self._active_download_refs: Dict[int, int] = {}
-        self.waiting_queue: list[QueueItem] = []
-        
-        self.user_queue_positions: Dict[int, QueueItem] = {}
         self.active_tasks: Dict[int, asyncio.Task] = {}
         
         self.user_cooldowns: Dict[int, float] = {}
         
         self._lock = asyncio.Lock()
-        self._processing = False
-        self._processor_task: Optional[asyncio.Task] = None
         
-        LOGGER(__name__).info(f"Queue Manager initialized: {max_concurrent} concurrent, {max_queue} max queue")
+        LOGGER(__name__).info(f"Download Manager initialized: {max_concurrent} concurrent max (no queue)")
     
     def add_active_download(self, user_id: int) -> None:
         """
         Add user to active_downloads with reference counting.
         Multiple calls increment the reference count - user is only removed when count reaches 0.
-        This allows batch downloads to hold a reference while individual downloads also hold references.
         """
         self.active_downloads.add(user_id)
         self._active_download_refs[user_id] = self._active_download_refs.get(user_id, 0) + 1
@@ -71,20 +51,12 @@ class DownloadQueueManager:
             LOGGER(__name__).debug(f"Active download removed for user {user_id}: was not ref-counted")
     
     async def start_processor(self):
-        if not self._processing:
-            self._processing = True
-            self._processor_task = asyncio.create_task(self._process_queue())
-            LOGGER(__name__).info("Queue processor started")
+        """No-op for compatibility - no queue processor needed"""
+        LOGGER(__name__).info("Download manager ready (no queue)")
     
     async def stop_processor(self):
-        self._processing = False
-        if self._processor_task:
-            self._processor_task.cancel()
-            try:
-                await self._processor_task
-            except asyncio.CancelledError:
-                pass
-        LOGGER(__name__).info("Queue processor stopped")
+        """No-op for compatibility"""
+        pass
     
     async def add_to_queue(
         self, 
@@ -93,9 +65,9 @@ class DownloadQueueManager:
         message,
         post_url: str,
         is_premium: bool = False
-    ) -> Tuple[bool, str]:
+    ) -> Tuple[bool, Optional[str]]:
+        """Start download immediately or reject if busy/at capacity"""
         async with self._lock:
-            # Check if user is in cooldown period
             if user_id in self.user_cooldowns:
                 current_time = datetime.now().timestamp()
                 can_download_at = self.user_cooldowns[user_id]
@@ -105,103 +77,61 @@ class DownloadQueueManager:
                     minutes = remaining // 60
                     seconds = remaining % 60
                     
-                    tier_name = "👑 **PREMIUM**" if is_premium else "🆓 **FREE**"
+                    tier_name = "PREMIUM" if is_premium else "FREE"
                     time_str = f"{minutes}m {seconds}s" if minutes > 0 else f"{seconds}s"
                     
                     return False, (
-                        f"⏰ **Download Cooldown Active!**\n\n"
+                        f"Download Cooldown Active!\n\n"
                         f"{tier_name} user\n"
-                        f"⏳ **Wait:** {time_str}\n\n"
-                        f"💡 You can download again after the cooldown ends.\n"
-                        f"This prevents server overload and ensures quality service for everyone!"
+                        f"Wait: {time_str}\n\n"
+                        f"You can download again after the cooldown ends."
                     )
             
-            if user_id in self.user_queue_positions or user_id in self.active_downloads:
-                position = self.get_queue_position(user_id)
-                if user_id in self.active_downloads:
-                    return False, (
-                        "❌ **You already have a download in progress!**\n\n"
-                        "⏳ Please wait for it to complete.\n\n"
-                        "💡 **Want to download this instead?**\n"
-                        "Use `/canceldownload` to cancel the current download."
-                    )
-                else:
-                    return False, (
-                        f"❌ **You already have a download in the queue!**\n\n"
-                        f"📍 **Position:** #{position}/{len(self.waiting_queue)}\n\n"
-                        f"💡 **Want to cancel it?**\n"
-                        f"Use `/canceldownload` to remove from queue."
-                    )
+            if user_id in self.active_downloads:
+                return False, (
+                    "You already have a download in progress!\n\n"
+                    "Please wait for it to complete.\n\n"
+                    "Want to download this instead?\n"
+                    "Use /canceldownload to cancel the current download."
+                )
             
             if len(self.active_downloads) >= self.max_concurrent:
-                if len(self.waiting_queue) >= self.max_queue:
-                    return False, (
-                        f"❌ **Download queue is full!**\n\n"
-                        f"🔄 **Active Downloads:** {len(self.active_downloads)}/{self.max_concurrent}\n"
-                        f"⏳ **Waiting in Queue:** {len(self.waiting_queue)}/{self.max_queue}\n\n"
-                        f"Please try again later."
-                    )
-                
-                priority = Priority.PREMIUM if is_premium else Priority.FREE
-                queue_item = QueueItem(
-                    priority=priority,
-                    timestamp=datetime.now().timestamp(),
-                    user_id=user_id,
-                    download_coro=download_coro,
-                    message=message,
-                    post_url=post_url
+                return False, (
+                    f"Server is busy!\n\n"
+                    f"Active Downloads: {len(self.active_downloads)}/{self.max_concurrent}\n\n"
+                    f"Please try again in a few minutes."
                 )
-                
-                self.waiting_queue.append(queue_item)
-                self.waiting_queue.sort()
-                self.user_queue_positions[user_id] = queue_item
-                
-                position = self.get_queue_position(user_id)
-                premium_badge = "👑 **PREMIUM**" if is_premium else "🆓 **FREE**"
-                
-                # Don't send queue message - only show completion message
-                return True, None
-            else:
-                self.add_active_download(user_id)
-                task = asyncio.create_task(self._execute_download(user_id, download_coro, message))
-                self.active_tasks[user_id] = task
-                
-                # Don't send download start message - only show completion message
-                # status_msg = f"✅ **Download started!**\n\n🔄 **Active Downloads:** {len(self.active_downloads)}/{self.max_concurrent}"
-                # asyncio.create_task(self._send_auto_delete_message(message, status_msg, 10))
-                
-                return True, None
-    
-    async def _send_auto_delete_message(self, message, text: str, delete_after: int):
-        """Send a message and auto-delete it after specified seconds"""
-        try:
-            sent_msg = await message.reply(text)
-            await asyncio.sleep(delete_after)
-            await sent_msg.delete()
-        except Exception as e:
-            LOGGER(__name__).debug(f"Failed to auto-delete message: {e}")
+            
+            self.add_active_download(user_id)
+            task = asyncio.create_task(self._execute_download(user_id, download_coro, message))
+            self.active_tasks[user_id] = task
+            
+            return True, None
     
     async def _execute_download(self, user_id: int, download_coro, message):
         import gc
         try:
             from memory_monitor import memory_monitor
+            from helpers.session_manager import session_manager
+            
+            if user_id in session_manager.last_activity:
+                from time import time
+                session_manager.last_activity[user_id] = time()
+                LOGGER(__name__).debug(f"Updated last_activity for user {user_id} at download start")
+            
             memory_monitor.log_memory_snapshot("Download Started", f"User {user_id} | Active: {len(self.active_downloads)}")
             
-            # No job-level timeout - processMediaGroup has its own per-file 45-minute timeout
-            # Each file in a media group gets 45 minutes, regardless of how many files
-            # This allows media groups of any size to complete properly
             try:
                 await download_coro
             except asyncio.CancelledError:
                 LOGGER(__name__).info(f"Download cancelled for user {user_id}")
-                raise  # Re-raise to properly handle cancellation
+                raise
             
             memory_monitor.log_memory_snapshot("Download Completed", f"User {user_id} | Active: {len(self.active_downloads)}")
         except asyncio.CancelledError:
-            # Handle cancellation gracefully - don't log as error
             LOGGER(__name__).info(f"Download task cancelled for user {user_id}")
             try:
-                await message.reply("❌ **Download cancelled**")
+                await message.reply("Download cancelled")
             except:
                 pass
         except Exception as e:
@@ -209,7 +139,7 @@ class DownloadQueueManager:
             import traceback
             LOGGER(__name__).error(f"Full traceback: {traceback.format_exc()}")
             try:
-                await message.reply(f"❌ **Download failed:** {str(e)}")
+                await message.reply(f"Download failed: {str(e)}")
             except:
                 pass
         finally:
@@ -217,17 +147,23 @@ class DownloadQueueManager:
                 self.remove_active_download(user_id)
                 self.active_tasks.pop(user_id, None)
             
-            # Force garbage collection to free memory immediately after download
+            try:
+                from helpers.session_manager import session_manager
+                from time import time
+                if user_id in session_manager.last_activity:
+                    session_manager.last_activity[user_id] = time()
+                    LOGGER(__name__).debug(f"Updated last_activity for user {user_id} after download completion")
+            except Exception as e:
+                LOGGER(__name__).debug(f"Could not update last_activity after download: {e}")
+            
             gc.collect()
             LOGGER(__name__).info(f"Download completed for user {user_id}. Active: {len(self.active_downloads)}. GC triggered.")
             
-            # Set cooldown for next download based on user tier
             try:
                 user_type = db.get_user_type(user_id)
                 is_premium = user_type in ['paid', 'admin']
                 delay = PyroConf.PREMIUM_DOWNLOAD_DELAY if is_premium else PyroConf.FREE_DOWNLOAD_DELAY
                 
-                # Set when user can download again
                 async with self._lock:
                     self.user_cooldowns[user_id] = datetime.now().timestamp() + delay
                 
@@ -237,93 +173,26 @@ class DownloadQueueManager:
             except Exception as e:
                 LOGGER(__name__).warning(f"Could not set download cooldown for user {user_id}: {e}")
     
-    async def _process_queue(self):
-        while self._processing:
-            try:
-                await asyncio.sleep(1)
-                
-                async with self._lock:
-                    while len(self.active_downloads) < self.max_concurrent and self.waiting_queue:
-                        queue_item = self.waiting_queue.pop(0)
-                        user_id = queue_item.user_id
-                        
-                        self.user_queue_positions.pop(user_id, None)
-                        
-                        if user_id in self.active_downloads:
-                            continue
-                        
-                        self.add_active_download(user_id)
-                        
-                        # Don't send download start message - only show completion message
-                        # try:
-                        #     status_msg = f"🚀 **Your download is starting now!**\n\n📥 Downloading: `{queue_item.post_url}`"
-                        #     asyncio.create_task(self._send_auto_delete_message(queue_item.message, status_msg, 10))
-                        # except:
-                        #     pass
-                        
-                        task = asyncio.create_task(
-                            self._execute_download(user_id, queue_item.download_coro, queue_item.message)
-                        )
-                        self.active_tasks[user_id] = task
-                        
-                        LOGGER(__name__).info(
-                            f"Started queued download for user {user_id}. "
-                            f"Active: {len(self.active_downloads)}, Queue: {len(self.waiting_queue)}"
-                        )
-            
-            except asyncio.CancelledError:
-                break
-            except Exception as e:
-                LOGGER(__name__).error(f"Queue processor error: {e}")
-    
-    def get_queue_position(self, user_id: int) -> int:
-        for idx, item in enumerate(self.waiting_queue, 1):
-            if item.user_id == user_id:
-                return idx
-        return 0
-    
     async def get_queue_status(self, user_id: int) -> str:
         async with self._lock:
             if user_id in self.active_downloads:
                 return (
-                    f"📥 **Your download is currently active!**\n\n"
-                    f"🔄 **Active Downloads:** {len(self.active_downloads)}/{self.max_concurrent}\n"
-                    f"⏳ **Waiting in Queue:** {len(self.waiting_queue)}/{self.max_queue}"
-                )
-            
-            position = self.get_queue_position(user_id)
-            if position > 0:
-                queue_item = self.user_queue_positions.get(user_id)
-                priority_text = "👑 **PREMIUM**" if queue_item and queue_item.priority == Priority.PREMIUM else "🆓 **FREE**"
-                
-                return (
-                    f"⏳ **You're in the queue!**\n\n"
-                    f"{priority_text}\n"
-                    f"📍 **Your Position:** #{position}/{len(self.waiting_queue)}\n"
-                    f"🔄 **Active Downloads:** {len(self.active_downloads)}/{self.max_concurrent}\n\n"
-                    f"💡 Estimated wait: ~{position * 2} minutes"
+                    f"Your download is currently active!\n\n"
+                    f"Active Downloads: {len(self.active_downloads)}/{self.max_concurrent}"
                 )
             
             return (
-                f"✅ **No active downloads**\n\n"
-                f"🔄 **Active Downloads:** {len(self.active_downloads)}/{self.max_concurrent}\n"
-                f"⏳ **Waiting in Queue:** {len(self.waiting_queue)}/{self.max_queue}\n\n"
-                f"💡 Send a download link to get started!"
+                f"No active downloads\n\n"
+                f"Active Downloads: {len(self.active_downloads)}/{self.max_concurrent}\n\n"
+                f"Send a download link to get started!"
             )
     
     async def get_global_status(self) -> str:
         async with self._lock:
-            premium_in_queue = sum(1 for item in self.waiting_queue if item.priority == Priority.PREMIUM)
-            free_in_queue = len(self.waiting_queue) - premium_in_queue
-            
             return (
-                f"📊 **Queue System Status**\n"
-                f"━━━━━━━━━━━━━━━━━━━\n"
-                f"🔄 **Active Downloads:** {len(self.active_downloads)}/{self.max_concurrent}\n"
-                f"⏳ **Waiting in Queue:** {len(self.waiting_queue)}/{self.max_queue}\n\n"
-                f"👑 Premium in queue: {premium_in_queue}\n"
-                f"🆓 Free in queue: {free_in_queue}\n\n"
-                f"💡 Premium users get priority!"
+                f"Download System Status\n"
+                f"-------------------\n"
+                f"Active Downloads: {len(self.active_downloads)}/{self.max_concurrent}"
             )
     
     async def cancel_user_download(self, user_id: int) -> Tuple[bool, str]:
@@ -334,15 +203,9 @@ class DownloadQueueManager:
                     task.cancel()
                 self.remove_active_download(user_id)
                 self.active_tasks.pop(user_id, None)
-                return True, "✅ **Active download cancelled!**"
+                return True, "Active download cancelled!"
             
-            queue_item = self.user_queue_positions.get(user_id)
-            if queue_item and queue_item in self.waiting_queue:
-                self.waiting_queue.remove(queue_item)
-                self.user_queue_positions.pop(user_id, None)
-                return True, "✅ **Removed from download queue!**"
-            
-            return False, "❌ **No active download or queue entry found.**"
+            return False, "No active download found."
     
     async def cancel_all_downloads(self) -> int:
         async with self._lock:
@@ -354,67 +217,35 @@ class DownloadQueueManager:
                     cancelled += 1
             
             self.active_downloads.clear()
-            self._active_download_refs.clear()  # Clear reference counts too
+            self._active_download_refs.clear()
             self.active_tasks.clear()
-            
-            cancelled += len(self.waiting_queue)
-            self.waiting_queue.clear()
-            self.user_queue_positions.clear()
             
             LOGGER(__name__).info(f"Cancelled all downloads: {cancelled} total")
             return cancelled
     
     async def sweep_stale_items(self, max_age_minutes: int = 60) -> Dict[str, int]:
-        """Remove orphaned queue items and tasks that are no longer running.
-        This prevents memory leaks from aborted downloads.
-        Returns counts of cleaned items."""
+        """Remove orphaned tasks that are no longer running."""
         async with self._lock:
             import gc
-            from datetime import datetime
             
-            cleanup_count = 0
             task_cleanup_count = 0
             
-            # Remove queue items older than max_age_minutes
-            cutoff_timestamp = (datetime.now().timestamp() - (max_age_minutes * 60))
-            stale_items = [item for item in self.waiting_queue if item.timestamp < cutoff_timestamp]
-            
-            for stale_item in stale_items:
-                try:
-                    self.waiting_queue.remove(stale_item)
-                    self.user_queue_positions.pop(stale_item.user_id, None)
-                    cleanup_count += 1
-                    LOGGER(__name__).warning(
-                        f"Cleaned up stale queue item for user {stale_item.user_id} "
-                        f"(age: {int((datetime.now().timestamp() - stale_item.timestamp) / 60)} minutes)"
-                    )
-                except Exception as e:
-                    LOGGER(__name__).error(f"Error removing stale queue item: {e}")
-            
-            # Remove orphaned tasks (done/cancelled but not cleaned up)
-            orphaned_users = []
             for user_id, task in list(self.active_tasks.items()):
                 if task.done() or task.cancelled():
-                    orphaned_users.append(user_id)
                     self.active_tasks.pop(user_id, None)
                     self.remove_active_download(user_id)
                     task_cleanup_count += 1
                     LOGGER(__name__).warning(f"Cleaned up orphaned task for user {user_id}")
             
-            if cleanup_count > 0 or task_cleanup_count > 0:
-                LOGGER(__name__).info(
-                    f"Queue sweep: cleaned {cleanup_count} stale items and "
-                    f"{task_cleanup_count} orphaned tasks"
-                )
-                # Force garbage collection after cleanup
+            if task_cleanup_count > 0:
+                LOGGER(__name__).info(f"Sweep: cleaned {task_cleanup_count} orphaned tasks")
                 gc.collect()
             
             return {
-                'stale_items': cleanup_count,
+                'stale_items': 0,
                 'orphaned_tasks': task_cleanup_count
             }
 
-# Detect constrained environments (Render, Replit) and reduce queue size
 IS_CONSTRAINED = bool(
     os.getenv('RENDER') or 
     os.getenv('RENDER_EXTERNAL_URL') or 
@@ -422,12 +253,6 @@ IS_CONSTRAINED = bool(
     os.getenv('REPL_ID')
 )
 
-# ULTRA-aggressive settings for Render's 512MB RAM limit
-# Render free tier: 3 concurrent downloads (prevents OOM), 20 max queue
-# Normal deployment: 20 concurrent downloads, 100 max queue
-# Note: Large video downloads can use 100-150MB each when buffering
-# With 3 concurrent: 3*150MB + 60MB base = 510MB max (safe for 512MB limit)
 MAX_CONCURRENT = 3 if IS_CONSTRAINED else 20
-MAX_QUEUE = 20 if IS_CONSTRAINED else 100
 
-download_queue = DownloadQueueManager(max_concurrent=MAX_CONCURRENT, max_queue=MAX_QUEUE)
+download_queue = DownloadManager(max_concurrent=MAX_CONCURRENT)
