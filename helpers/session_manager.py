@@ -179,7 +179,7 @@ class SessionManager:
             idle_users = []
             for user_id, last_active in list(self.last_activity.items()):
                 idle_seconds = current_time - last_active
-                if idle_seconds > self.idle_timeout_seconds:
+                if idle_seconds >= self.idle_timeout_seconds:
                     idle_users.append(user_id)
             
             for user_id in idle_users:
@@ -207,6 +207,9 @@ class SessionManager:
                         memory_monitor.log_memory_snapshot("Idle Session Cleanup", f"User {user_id} idle for {idle_minutes:.1f}min")
                     except Exception as e:
                         LOGGER(__name__).error(f"Error disconnecting idle session {user_id}: {e}")
+                else:
+                    self.last_activity.pop(user_id, None)
+                    LOGGER(__name__).debug(f"Cleaned up orphaned last_activity entry for user {user_id}")
         
         if disconnected_count > 0 or skipped_active_downloads > 0:
             LOGGER(__name__).info(
@@ -229,9 +232,8 @@ class SessionManager:
         """Background task that periodically cleans up idle sessions"""
         while True:
             try:
-                # Run cleanup every 10 minutes
-                await asyncio.sleep(600)
                 await self.cleanup_idle_sessions()
+                await asyncio.sleep(600)
             except asyncio.CancelledError:
                 break
             except Exception as e:
