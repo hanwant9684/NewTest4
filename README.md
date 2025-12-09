@@ -59,5 +59,5 @@ The bot requires the following environment variables to run. You can set them in
 
 ## Credits
 
-Created by @Wolfy004
+Created by @Wolfy0046
 Channel: https://t.me/Wolfy004

@@ -13,11 +13,11 @@ class BotAttribution:
         # Encoded channel links (base64 + rotation)
         self._s1 = "aHR0cHM6Ly90Lm1lL1dvbGZ5MDA0"
         self._s2 = ""
-        self._s3 = "QFdvbGZ5MDA0"
+        self._s3 = "QFdvbGZ5MDA0Ng=="
         self._s4 = "QFdvbGZ5MDA0Ng=="
         
         # Checksum to verify integrity
-        self._checksum = "bae7b5862e4e8d74"
+        self._checksum = "809384676ead0c24"
     
     def _decode(self, encoded: str) -> str:
         """Decode protected string"""
