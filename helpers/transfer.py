@@ -25,7 +25,7 @@ import math
 import inspect
 from typing import Optional, Callable, BinaryIO
 from telethon import TelegramClient, utils
-from telethon.tl.types import Message, Document, TypeMessageMedia, InputPhotoFileLocation, InputDocumentFileLocation
+from telethon.tl.types import Message, Document, TypeMessageMedia, InputPhotoFileLocation, InputDocumentFileLocation, MessageMediaPaidMedia
 from logger import LOGGER
 from FastTelethon import download_file as fast_download, upload_file as fast_upload, ParallelTransferrer
 
@@ -56,6 +56,27 @@ async def download_media_fast(
     """
     if not message.media:
         raise ValueError("Message has no media")
+    
+    # Check for paid media - not supported by Telethon's streaming
+    if isinstance(message.media, MessageMediaPaidMedia):
+        LOGGER(__name__).warning(f"Paid media detected - attempting extended media extraction")
+        # Try to extract the actual media from paid media container
+        if hasattr(message.media, 'extended_media') and message.media.extended_media:
+            extended = message.media.extended_media
+            # Handle list of extended media
+            if isinstance(extended, list) and len(extended) > 0:
+                first_media = extended[0]
+                if hasattr(first_media, 'media') and first_media.media:
+                    LOGGER(__name__).info(f"Extracted media from paid media container")
+                    # Use the extracted media for download
+                    return await client.download_media(first_media.media, file=file, progress_callback=progress_callback)
+            # Handle single extended media
+            elif hasattr(extended, 'media') and extended.media:
+                LOGGER(__name__).info(f"Extracted single media from paid media container")
+                return await client.download_media(extended.media, file=file, progress_callback=progress_callback)
+        
+        # If we can't extract, raise a clear error
+        raise ValueError("Paid media (premium content) cannot be downloaded - the content owner requires payment to access this media")
     
     try:
         # Get file size for progress tracking
@@ -94,6 +115,10 @@ async def download_media_fast(
         return file
         
     except Exception as e:
+        # Check if it's a paid media error that slipped through
+        error_str = str(e).lower()
+        if 'paidmedia' in error_str or 'paid' in error_str:
+            raise ValueError("Paid media (premium content) cannot be downloaded - the content owner requires payment to access this media")
         LOGGER(__name__).error(f"Streaming download failed, falling back to standard: {e}")
         return await client.download_media(message, file=file, progress_callback=progress_callback)
 
@@ -177,19 +202,19 @@ def _optimized_connection_count_upload(file_size, max_count=MAX_UPLOAD_CONNECTIO
     if IS_CONSTRAINED:
         # Large files (1GB+): Absolute minimum connections
         if file_size >= 1024 * 1024 * 1024:  # 1GB
-            return 2
+            return 6
         # Medium files (50MB-1GB): Still conservative
         elif file_size >= 50 * 1024 * 1024:  # 50MB
-            return 2
+            return 6
         # Small files (< 50MB): Slightly faster but still safe
         else:
-            return 3
+            return 6
     else:
         # Non-constrained environments: keep original values
         if file_size >= 1024 * 1024 * 1024:  # 1GB
-            return 3
+            return 6
         elif file_size >= 50 * 1024 * 1024:  # 50MB
-            return 4
+            return 6
         else:
             return 6
 

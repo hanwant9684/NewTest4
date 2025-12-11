@@ -95,7 +95,7 @@ async def generate_thumbnail(video_path, thumb_path=None, duration=None):
         try:
             stdout, stderr = await wait_for(proc.communicate(), timeout=10.0)
         except asyncio.TimeoutError:
-            LOGGER(__name__).warning(f"Thumbnail generation timed out - skipping")
+            LOGGER(__name__).warning(f"Thumbnail generation timed out after 10s - skipping")
             proc.kill()
             await proc.wait()
             return None
