@@ -64,6 +64,11 @@ None specified yet. Add preferences as they are expressed.
         *   Attempts to extract actual media from extended_media container if accessible
         *   Provides clear error message when paid content cannot be downloaded
     *   **Thumbnail Generation Optimization (Dec 2025):** Increased ffmpeg timeout from 10s to 30s to reduce thumbnail generation failures for larger video files.
+    *   **Accurate Upload Speed Calculation (Dec 2025):** Fixed inaccurate upload speed display that was showing average speed since transfer start instead of current speed. The fix:
+        *   Tracks bytes transferred and time between each progress update
+        *   Calculates speed based on bytes transferred in the last interval (real-time speed)
+        *   Falls back to average speed only for the first update when no previous data exists
+        *   Results in more accurate speed display that reflects actual current transfer rate
     *   **SQLite Database:** Chosen for its portability and low resource footprint.
     *   **Waitress WSGI Server:** Selected over Flask for its minimal RAM consumption.
     *   **uvloop:** Used for performance enhancement of the event loop.
