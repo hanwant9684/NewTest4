@@ -207,6 +207,10 @@ class SessionManager:
                         LOGGER(__name__).info(f"Session cleaned up: User {user_id} was idle for {idle_minutes:.0f}min")
                     except Exception as e:
                         LOGGER(__name__).error(f"Error disconnecting idle session {user_id}: {e}")
+                        # Force remove even if disconnect fails to prevent memory leak
+                        self.active_sessions.pop(user_id, None)
+                        self.last_activity.pop(user_id, None)
+                        disconnected_count += 1
                 else:
                     self.last_activity.pop(user_id, None)
                     LOGGER(__name__).debug(f"Cleaned up orphaned last_activity entry for user {user_id}")

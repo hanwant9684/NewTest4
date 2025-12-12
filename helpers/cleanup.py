@@ -54,6 +54,9 @@ async def start_periodic_cleanup(interval_minutes=45):
         try:
             await asyncio.sleep(interval_minutes * 60)
             await cleanup_old_downloads(max_age_minutes=45)
+        except asyncio.CancelledError:
+            LOGGER(__name__).info("Periodic cleanup task cancelled")
+            break
         except Exception as e:
             LOGGER(__name__).error(f"Error in periodic cleanup task: {e}")
             await asyncio.sleep(60)  # Wait 1 minute before retry
