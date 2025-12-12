@@ -215,23 +215,33 @@ class PhoneAuthHandler:
                 current_time = time.time()
                 stale_timeout = 900  # 15 minutes in seconds
                 
+                # Create a copy of items to avoid modifying dict during iteration
                 stale_users = []
-                for user_id, auth_data in self.pending_auth.items():
+                for user_id, auth_data in list(self.pending_auth.items()):
                     if current_time - auth_data.get('created_at', 0) > stale_timeout:
                         stale_users.append(user_id)
                 
                 # Cleanup stale sessions
+                cleaned = 0
                 for user_id in stale_users:
-                    try:
-                        LOGGER(__name__).info(f"Cleaning up stale auth session for user {user_id}")
-                        await self.pending_auth[user_id]['client'].disconnect()
-                        del self.pending_auth[user_id]
-                    except Exception as e:
-                        LOGGER(__name__).error(f"Error cleaning up session for user {user_id}: {e}")
+                    if user_id in self.pending_auth:  # Double-check it still exists
+                        try:
+                            LOGGER(__name__).info(f"Cleaning up stale auth session for user {user_id}")
+                            await self.pending_auth[user_id]['client'].disconnect()
+                            del self.pending_auth[user_id]
+                            cleaned += 1
+                        except Exception as e:
+                            # Force remove even if disconnect fails to prevent memory leak
+                            self.pending_auth.pop(user_id, None)
+                            cleaned += 1
+                            LOGGER(__name__).error(f"Error cleaning up session for user {user_id}: {e}")
                 
-                if stale_users:
-                    LOGGER(__name__).info(f"Cleaned up {len(stale_users)} stale auth session(s)")
+                if cleaned > 0:
+                    LOGGER(__name__).info(f"Cleaned up {cleaned} stale auth session(s)")
                     
+            except asyncio.CancelledError:
+                LOGGER(__name__).info("Auth session cleanup task cancelled")
+                break
             except Exception as e:
                 LOGGER(__name__).error(f"Error in auth session cleanup task: {e}")
                 await asyncio.sleep(60)  # Wait 1 minute before retry on error

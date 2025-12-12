@@ -215,11 +215,25 @@ import secrets
 import hashlib
 from http.cookies import SimpleCookie
 
-# Simple in-memory session store
+# Simple in-memory session store with expiry timestamps
 _admin_sessions = {}
+_SESSION_MAX_AGE = 86400  # 24 hours in seconds
+
+def _cleanup_expired_sessions():
+    """Remove expired admin sessions to prevent memory leak"""
+    import time
+    current_time = time.time()
+    expired = [sid for sid, created_at in _admin_sessions.items() 
+               if current_time - created_at > _SESSION_MAX_AGE]
+    for sid in expired:
+        del _admin_sessions[sid]
+    if expired:
+        _logger.debug(f"Cleaned up {len(expired)} expired admin sessions")
 
 def check_admin_auth(environ):
     """Check if user is authenticated as admin via session cookie"""
+    _cleanup_expired_sessions()  # Clean up on each auth check
+    
     cookie_header = environ.get('HTTP_COOKIE', '')
     if not cookie_header:
         return False
@@ -229,13 +243,22 @@ def check_admin_auth(environ):
     
     if 'admin_session' in cookie:
         session_id = cookie['admin_session'].value
-        return session_id in _admin_sessions
+        if session_id in _admin_sessions:
+            import time
+            # Check if session is still valid
+            created_at = _admin_sessions[session_id]
+            if time.time() - created_at <= _SESSION_MAX_AGE:
+                return True
+            else:
+                del _admin_sessions[session_id]
     return False
 
 def create_admin_session():
     """Create a new admin session and return session ID"""
+    import time
+    _cleanup_expired_sessions()  # Clean up before creating new session
     session_id = secrets.token_urlsafe(32)
-    _admin_sessions[session_id] = True
+    _admin_sessions[session_id] = time.time()  # Store creation timestamp
     return session_id
 
 def verify_password(password):
@@ -1234,6 +1257,10 @@ async def periodic_gc_task():
                 from logger import LOGGER
                 LOGGER(__name__).debug(f"Garbage collection freed {collected} objects")
                 memory_monitor.log_memory_snapshot("Garbage Collection", f"Freed {collected} objects", silent=True)
+        except asyncio.CancelledError:
+            from logger import LOGGER
+            LOGGER(__name__).info("Periodic garbage collection task cancelled")
+            break
         except Exception as e:
             from logger import LOGGER
             LOGGER(__name__).error(f"Garbage collection error: {e}")
@@ -1278,6 +1305,10 @@ async def cleanup_watchdog_task():
             from memory_monitor import memory_monitor
             memory_monitor.log_memory_snapshot("Cleanup Watchdog", "After cleanup sweep", silent=True)
             
+        except asyncio.CancelledError:
+            from logger import LOGGER
+            LOGGER(__name__).info("Cleanup watchdog task cancelled")
+            break
         except Exception as e:
             from logger import LOGGER
             LOGGER(__name__).error(f"Cleanup watchdog error: {e}")
@@ -1382,6 +1413,9 @@ def run_bot():
                                 f"⏰ Periodic cleanup: Removed {files} orphaned files "
                                 f"({bytes_freed / (1024*1024):.1f} MB freed)"
                             )
+                    except asyncio.CancelledError:
+                        main.LOGGER(__name__).info("Periodic orphaned cleanup task cancelled")
+                        break
                     except Exception as e:
                         main.LOGGER(__name__).error(f"Periodic orphaned cleanup error: {e}")
             

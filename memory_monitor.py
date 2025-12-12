@@ -254,6 +254,9 @@ class MemoryMonitor:
                     # Silent tracking - just store in history
                     self.log_memory_snapshot("Periodic", "", silent=True)
                     
+            except asyncio.CancelledError:
+                self.logger.info("Periodic memory monitor task cancelled")
+                break
             except Exception as e:
                 self.logger.error(f"Periodic monitor error: {e}")
 

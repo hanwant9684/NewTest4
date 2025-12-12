@@ -111,15 +111,19 @@ def check_download_limit(func):
             ])
             sent_msg = await event.respond(message_text, buttons=keyboard.to_telethon())
             
-            # Auto-delete after 30 seconds
+            # Auto-delete after 30 seconds (fire-and-forget, cleaned up automatically)
             async def delete_after_delay():
                 try:
                     await asyncio.sleep(30)
                     await sent_msg.delete()
+                except asyncio.CancelledError:
+                    pass  # Task cancelled during shutdown, ignore
                 except Exception as e:
                     LOGGER(__name__).debug(f"Could not delete daily limit message: {e}")
             
-            asyncio.create_task(delete_after_delay())
+            # Create task with name for debugging; task auto-cleans when done
+            task = asyncio.create_task(delete_after_delay())
+            task.add_done_callback(lambda t: t.exception() if not t.cancelled() else None)
             return
 
         return await func(event)

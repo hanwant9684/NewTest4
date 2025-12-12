@@ -224,11 +224,13 @@ class DownloadManager:
             return cancelled
     
     async def sweep_stale_items(self, max_age_minutes: int = 60) -> Dict[str, int]:
-        """Remove orphaned tasks that are no longer running."""
+        """Remove orphaned tasks and expired cooldowns to prevent memory leaks."""
         async with self._lock:
             import gc
             
             task_cleanup_count = 0
+            cooldown_cleanup_count = 0
+            current_time = datetime.now().timestamp()
             
             for user_id, task in list(self.active_tasks.items()):
                 if task.done() or task.cancelled():
@@ -237,13 +239,25 @@ class DownloadManager:
                     task_cleanup_count += 1
                     LOGGER(__name__).warning(f"Cleaned up orphaned task for user {user_id}")
             
-            if task_cleanup_count > 0:
-                LOGGER(__name__).info(f"Sweep: cleaned {task_cleanup_count} orphaned tasks")
+            expired_cooldowns = [
+                user_id for user_id, expire_time in self.user_cooldowns.items()
+                if current_time >= expire_time
+            ]
+            for user_id in expired_cooldowns:
+                del self.user_cooldowns[user_id]
+                cooldown_cleanup_count += 1
+            
+            if cooldown_cleanup_count > 0:
+                LOGGER(__name__).debug(f"Sweep: cleaned {cooldown_cleanup_count} expired cooldowns")
+            
+            if task_cleanup_count > 0 or cooldown_cleanup_count > 0:
+                LOGGER(__name__).info(f"Sweep: cleaned {task_cleanup_count} orphaned tasks, {cooldown_cleanup_count} expired cooldowns")
                 gc.collect()
             
             return {
                 'stale_items': 0,
-                'orphaned_tasks': task_cleanup_count
+                'orphaned_tasks': task_cleanup_count,
+                'expired_cooldowns': cooldown_cleanup_count
             }
 
 IS_CONSTRAINED = bool(
