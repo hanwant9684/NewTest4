@@ -148,7 +148,7 @@ async def get_user_client(user_id: int):
     Get user's personal client if they have session
     
     CRITICAL: Uses SessionManager to limit concurrent sessions and prevent memory exhaustion
-    On Render (512MB RAM), limits to 3 concurrent user sessions (3 * 100MB = 300MB)
+    On Render/Replit (512MB RAM), limits to 5 concurrent user sessions (5 * 70MB = ~350MB)
     Sessions are reused across downloads - DO NOT call client.stop() after each download!
     
     Returns:
@@ -234,6 +234,7 @@ def force_subscribe(func):
             # Use Telethon's get_participant to check membership (singular, not plural)
             # This directly checks if a specific user is a participant
             client = event.client
+            chat_entity = None
             try:
                 # Get channel entity first
                 chat_entity = await client.get_entity(channel)
@@ -249,6 +250,9 @@ def force_subscribe(func):
             except Exception as e:
                 # If get_participant fails for other reasons, try alternative method
                 LOGGER(__name__).debug(f"get_participant failed, trying get_permissions: {e}")
+                if chat_entity is None:
+                    # If we couldn't get entity, allow access to avoid blocking
+                    return await func(event)
                 try:
                     # Fallback: check if user has permissions
                     permissions = await client.get_permissions(chat_entity, user_id)

@@ -78,7 +78,7 @@ bot = TelegramClient(
 
 # REMOVED: Global user client was bypassing SessionManager and wasting 30-100MB RAM
 # All users (including admins) must login with /login command to use SessionManager
-# This ensures proper memory limits (max 3 sessions on Render = 300MB)
+# This ensures proper memory limits (max 5 sessions on Render/Replit = ~350MB)
 
 # Phone authentication handler
 phone_auth_handler = PhoneAuthHandler(PyroConf.API_ID, PyroConf.API_HASH)
@@ -357,6 +357,7 @@ async def handle_download(bot_client, event, post_url: str, user_client=None, in
             LOGGER(__name__).error(f"Cannot find entity {chat_id}: {e}")
             
             # Try to load all dialogs to populate entity cache, then try again
+            status_msg = None
             try:
                 LOGGER(__name__).info(f"Fetching dialogs to populate entity cache for user {event.sender_id}")
                 status_msg = await event.respond("🔄 **Loading your channels... Please wait.**")
@@ -367,10 +368,12 @@ async def handle_download(bot_client, event, post_url: str, user_client=None, in
                 
                 # Try to resolve entity again after loading dialogs
                 entity = await client_to_use.get_entity(chat_id)
-                await status_msg.delete()
+                if status_msg:
+                    await status_msg.delete()
                 LOGGER(__name__).debug(f"Resolved entity after loading dialogs: {chat_id}")
             except ValueError as e2:
-                await status_msg.delete()
+                if status_msg:
+                    await status_msg.delete()
                 LOGGER(__name__).error(f"Still cannot find entity {chat_id} after loading dialogs: {e2}")
                 await event.respond(
                     f"❌ **Cannot access this channel/chat.**\n\n"
@@ -386,10 +389,11 @@ async def handle_download(bot_client, event, post_url: str, user_client=None, in
                 )
                 return
             except Exception as e3:
-                try:
-                    await status_msg.delete()
-                except:
-                    pass
+                if status_msg:
+                    try:
+                        await status_msg.delete()
+                    except:
+                        pass
                 LOGGER(__name__).error(f"Error loading dialogs: {e3}")
                 await event.respond(f"❌ **Error accessing channel:**\n\n`{str(e3)}`")
                 return
@@ -955,16 +959,8 @@ async def verify_command(event):
 
         # Verify OTP
         LOGGER(__name__).info(f"Calling verify_otp for user {event.sender_id}")
-        result = await phone_auth_handler.verify_otp(event.sender_id, otp_code)
-        LOGGER(__name__).info(f"verify_otp returned {len(result)} items for user {event.sender_id}")
-
-        if len(result) == 4:
-            success, msg, needs_2fa, session_string = result
-            LOGGER(__name__).info(f"Received session_string for user {event.sender_id}, length: {len(session_string) if session_string else 0}")
-        else:
-            success, msg, needs_2fa = result
-            session_string = None
-            LOGGER(__name__).warning(f"No session_string in result for user {event.sender_id}")
+        success, msg, needs_2fa, session_string = await phone_auth_handler.verify_otp(event.sender_id, otp_code)
+        LOGGER(__name__).info(f"verify_otp returned for user {event.sender_id}, session_string length: {len(session_string) if session_string else 0}")
 
         await event.respond(msg)
 
@@ -1273,7 +1269,7 @@ async def get_premium_command(event):
         
         if user_type == 'paid':
             user = db.get_user(event.sender_id)
-            expiry_date_str = user.get('subscription_end', 'N/A')
+            expiry_date_str = user.get('subscription_end', 'N/A') if user else 'N/A'
             
             # Calculate time remaining
             time_left_msg = ""
@@ -1723,35 +1719,27 @@ async def verify_dump_channel():
 # This ensures downloaded files are cleaned up every 30 minutes to prevent memory/disk leaks
 
 if __name__ == "__main__":
-    try:
-        # When running main.py directly (not through server_wsgi.py),
-        # we need to start the queue processor using asyncio
-        async def start_with_queue():
-            from queue_manager import download_manager
+    async def main():
+        from queue_manager import download_manager
+        from helpers.session_manager import session_manager
+        
+        try:
             await bot.start(bot_token=PyroConf.BOT_TOKEN)
             await download_manager.start_processor()
             LOGGER(__name__).info("Download queue processor initialized")
             LOGGER(__name__).info("Bot Started!")
-            # Wait for the bot to be disconnected (keeps running until stopped)
-            await bot.disconnected
-        
-        import asyncio
-        loop = asyncio.get_event_loop()
-        loop.run_until_complete(start_with_queue())
-    except KeyboardInterrupt:
-        pass
-    except Exception as err:
-        LOGGER(__name__).error(err)
-    finally:
-        # Gracefully disconnect all user sessions before shutdown
-        try:
-            import asyncio
-            from helpers.session_manager import session_manager
-            loop = asyncio.get_event_loop()
-            if not loop.is_closed():
-                loop.run_until_complete(session_manager.disconnect_all())
+            await bot.run_until_disconnected()
+        except KeyboardInterrupt:
+            pass
+        except Exception as err:
+            LOGGER(__name__).error(err)
+        finally:
+            try:
+                await session_manager.disconnect_all()
                 LOGGER(__name__).info("Disconnected all user sessions")
-        except Exception as e:
-            LOGGER(__name__).error(f"Error disconnecting sessions: {e}")
-        
-        LOGGER(__name__).info("Bot Stopped")
+            except Exception as e:
+                LOGGER(__name__).error(f"Error disconnecting sessions: {e}")
+            LOGGER(__name__).info("Bot Stopped")
+    
+    import asyncio
+    asyncio.run(main())
