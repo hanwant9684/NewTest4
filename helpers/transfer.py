@@ -189,12 +189,12 @@ def _optimized_connection_count_upload(file_size, max_count=MAX_UPLOAD_CONNECTIO
     CONSTRAINED (Replit/Render - 512MB RAM):
     - Files >= 1GB: 16 connections - StringSession uses minimal RAM
     - Files 50MB-1GB: 16 connections - StringSession uses minimal RAM
-    - Files < 50MB: 16 connections - StringSession uses minimal RAM
+    - Files < 50MB: 2 connections - StringSession uses minimal RAM
     
     NON-CONSTRAINED (standard servers):
     - Files >= 1GB: 16 connections
     - Files 50MB-1GB: 16 connections
-    - Files < 50MB: 16 connections
+    - Files < 50MB: 2 connections
     
     IMPORTANT: Uses MAX_UPLOAD_CONNECTIONS as ceiling to stay within memory limits.
     """
@@ -204,14 +204,14 @@ def _optimized_connection_count_upload(file_size, max_count=MAX_UPLOAD_CONNECTIO
         elif file_size >= 50 * 1024 * 1024:  # 50MB-1GB
             return min(16, MAX_UPLOAD_CONNECTIONS)
         else:  # < 50MB
-            return min(16, MAX_UPLOAD_CONNECTIONS)
+            return min(2, MAX_UPLOAD_CONNECTIONS)
     else:
         if file_size >= 1024 * 1024 * 1024:  # 1GB+
             return min(16, MAX_UPLOAD_CONNECTIONS)
         elif file_size >= 50 * 1024 * 1024:  # 50MB-1GB
             return min(16, MAX_UPLOAD_CONNECTIONS)
         else:  # < 50MB
-            return min(16, MAX_UPLOAD_CONNECTIONS)
+            return min(2, MAX_UPLOAD_CONNECTIONS)
 
 # Apply optimized upload connection count to FastTelethon
 ParallelTransferrer._get_connection_count = staticmethod(_optimized_connection_count_upload)
