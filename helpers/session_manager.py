@@ -84,7 +84,7 @@ class SessionManager:
                         # Clear activity timestamp for evicted session
                         self.last_activity.pop(oldest_idle_user, None)
                         LOGGER(__name__).info(f"Disconnected oldest idle session: user {oldest_idle_user} (no active downloads)")
-                        memory_monitor.log_memory_snapshot("Session Disconnected", f"Freed idle session for user {oldest_idle_user}", silent=True)
+                        memory_monitor.log_memory_snapshot("Session Disconnected", f"Freed idle session for user {oldest_idle_user}")
                     except Exception as e:
                         LOGGER(__name__).error(f"Error disconnecting session {oldest_idle_user}: {e}")
                 else:
@@ -126,7 +126,7 @@ class SessionManager:
                 self.last_activity[user_id] = time()
                 LOGGER(__name__).info(f"Created new session for user {user_id} ({len(self.active_sessions)}/{self.max_sessions})")
                 
-                memory_monitor.log_memory_snapshot("Session Created", f"User {user_id} - Total sessions: {len(self.active_sessions)}", silent=True)
+                memory_monitor.log_memory_snapshot("Session Created", f"User {user_id} - Total sessions: {len(self.active_sessions)}")
                 
                 return (client, None)
                 
@@ -145,7 +145,7 @@ class SessionManager:
                     del self.active_sessions[user_id]
                     self.last_activity.pop(user_id, None)
                     LOGGER(__name__).info(f"Removed session for user {user_id}")
-                    memory_monitor.log_memory_snapshot("Session Removed", f"User {user_id}", silent=True)
+                    memory_monitor.log_memory_snapshot("Session Removed", f"User {user_id}")
                 except Exception as e:
                     LOGGER(__name__).error(f"Error removing session {user_id}: {e}")
     
@@ -244,8 +244,8 @@ class SessionManager:
         return len(self.active_sessions)
 
 # Global session manager instance (import this in other modules)
-# Limit to 5 sessions on Render/Replit (5 * ~30MB = ~150MB with streaming)
-# Limit to 8 sessions on normal deployment (more RAM available)
+# Limit to 3 sessions on Render/Replit (3 * 70MB = ~210MB + 150MB baseline = ~360MB)
+# Limit to 5 sessions on normal deployment (more RAM available)
 import os
 IS_CONSTRAINED = bool(
     os.getenv('RENDER') or 
@@ -254,6 +254,6 @@ IS_CONSTRAINED = bool(
     os.getenv('REPL_ID')
 )
 
-MAX_SESSIONS = 5 if IS_CONSTRAINED else 8
+MAX_SESSIONS = 3 if IS_CONSTRAINED else 5
 IDLE_TIMEOUT_MINUTES = 10  # Reduced from 30 since smart timeout protects active downloads
 session_manager = SessionManager(max_sessions=MAX_SESSIONS, idle_timeout_minutes=IDLE_TIMEOUT_MINUTES)
