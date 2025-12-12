@@ -1233,7 +1233,7 @@ async def periodic_gc_task():
             if collected > 0:
                 from logger import LOGGER
                 LOGGER(__name__).debug(f"Garbage collection freed {collected} objects")
-                memory_monitor.log_memory_snapshot("Garbage Collection", f"Freed {collected} objects", silent=True)
+                memory_monitor.log_memory_snapshot("Garbage Collection", f"Freed {collected} objects")
         except Exception as e:
             from logger import LOGGER
             LOGGER(__name__).error(f"Garbage collection error: {e}")
@@ -1276,7 +1276,7 @@ async def cleanup_watchdog_task():
             
             # Log memory snapshot after cleanup
             from memory_monitor import memory_monitor
-            memory_monitor.log_memory_snapshot("Cleanup Watchdog", "After cleanup sweep", silent=True)
+            memory_monitor.log_memory_snapshot("Cleanup Watchdog", "After cleanup sweep")
             
         except Exception as e:
             from logger import LOGGER

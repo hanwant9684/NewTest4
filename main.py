@@ -501,7 +501,7 @@ async def handle_download(bot_client, event, post_url: str, user_client=None, in
             # Set expected path BEFORE download - ensures cleanup works even if timeout during download
             media_path = download_path
 
-            memory_monitor.log_memory_snapshot("Download Start", f"User {event.sender_id}: {filename}", silent=True)
+            memory_monitor.log_memory_snapshot("Download Start", f"User {event.sender_id}: {filename}")
             
             async def process_single_file():
                 nonlocal media_path
@@ -514,7 +514,7 @@ async def handle_download(bot_client, event, post_url: str, user_client=None, in
                 )
                 media_path = result_path  # Update with actual result
 
-                memory_monitor.log_memory_snapshot("Download Complete", f"User {event.sender_id}: {filename}", silent=True)
+                memory_monitor.log_memory_snapshot("Download Complete", f"User {event.sender_id}: {filename}")
                 LOGGER(__name__).debug(f"Downloaded media: {media_path}")
                 
                 # RAM OPTIMIZATION: Release download buffers before upload starts

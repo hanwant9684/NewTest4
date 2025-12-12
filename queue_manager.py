@@ -119,7 +119,7 @@ class DownloadManager:
                 session_manager.last_activity[user_id] = time()
                 LOGGER(__name__).debug(f"Updated last_activity for user {user_id} at download start")
             
-            memory_monitor.log_memory_snapshot("Download Started", f"User {user_id} | Active: {len(self.active_downloads)}", silent=True)
+            memory_monitor.log_memory_snapshot("Download Started", f"User {user_id} | Active: {len(self.active_downloads)}")
             
             try:
                 await download_coro
@@ -127,7 +127,7 @@ class DownloadManager:
                 LOGGER(__name__).info(f"Download cancelled for user {user_id}")
                 raise
             
-            memory_monitor.log_memory_snapshot("Download Completed", f"User {user_id} | Active: {len(self.active_downloads)}", silent=True)
+            memory_monitor.log_memory_snapshot("Download Completed", f"User {user_id} | Active: {len(self.active_downloads)}")
         except asyncio.CancelledError:
             LOGGER(__name__).info(f"Download task cancelled for user {user_id}")
             try:
@@ -253,6 +253,6 @@ IS_CONSTRAINED = bool(
     os.getenv('REPL_ID')
 )
 
-MAX_CONCURRENT = 5 if IS_CONSTRAINED else 20
+MAX_CONCURRENT = 3 if IS_CONSTRAINED else 20
 
 download_manager = DownloadManager(max_concurrent=MAX_CONCURRENT)

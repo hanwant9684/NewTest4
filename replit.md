@@ -18,7 +18,7 @@ None specified yet. Add preferences as they are expressed.
 ### Core Features & Design Decisions
 
 1.  **Media Handling:**
-    *   **Concurrency Control:** Implements download management with 5 concurrent download slots (no queue, immediate rejection when busy).
+    *   **Concurrency Control:** Implements download management with 3 concurrent download slots (no queue, immediate rejection when busy).
     *   **Efficient Media Group Downloads:** Processes media group files sequentially (download, upload, delete) to prevent high RAM usage, uploading them as individual messages rather than grouped albums for memory efficiency.
     *   **Per-File Timeout for Media Groups (Dec 2025):** Each file in a media group now gets its own 45-minute timeout (2700 seconds) instead of sharing a single timeout for the entire group. This prevents large files from starving smaller ones and ensures each file has adequate time to complete, regardless of how many files are in the group.
     *   **Hybrid Transfer Approach (Nov 2025):**
@@ -28,7 +28,7 @@ None specified yet. Add preferences as they are expressed.
 
 2.  **User & Session Management:**
     *   **Authentication & Access Control:** Features a user authentication and permission system, including phone-based authentication for restricted content.
-    *   **Session Pooling:** Manages user sessions with a maximum of 5 concurrent sessions and a 10-minute idle timeout.
+    *   **Session Pooling:** Manages user sessions with a maximum of 3 concurrent sessions and a 10-minute idle timeout.
     *   **Smart Session Eviction:** Protects active downloads by only evicting idle sessions when all slots are busy, ensuring uninterrupted user experience.
     *   **Smart Session Timeout (Dec 2025):** Sessions with active downloads are NEVER disconnected due to idle timeout. The periodic cleanup task checks `download_manager.active_downloads` before expiring any session, ensuring downloads complete successfully. Sessions are only cleaned up after downloads finish and the idle timeout expires.
     *   **Batch Download Session Protection (Dec 2025):** Fixed critical bug where batch downloads (`/bdl` command) would fail after 10 minutes because the session was disconnected due to "idle" timeout. The fix includes:
