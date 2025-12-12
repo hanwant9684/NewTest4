@@ -78,7 +78,7 @@ bot = TelegramClient(
 
 # REMOVED: Global user client was bypassing SessionManager and wasting 30-100MB RAM
 # All users (including admins) must login with /login command to use SessionManager
-# This ensures proper memory limits (max 5 sessions on Render/Replit = ~350MB)
+# This ensures proper memory limits (max 10 sessions on Render/Replit, ~5-10MB each due to StringSession)
 
 # Phone authentication handler
 phone_auth_handler = PhoneAuthHandler(PyroConf.API_ID, PyroConf.API_HASH)

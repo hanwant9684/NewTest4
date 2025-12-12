@@ -108,9 +108,9 @@ IS_CONSTRAINED = bool(
     os.getenv('REPL_ID')
 )
 
-# ULTRA-aggressive cache reduction for Render's 512MB RAM
-# Each cache entry can be 1-10KB, so 50 items = ~50-500KB max
-CACHE_SIZE = 50 if IS_CONSTRAINED else 500
+# Cache size adjusted for actual RAM usage (~160MB stable)
+# Each cache entry can be 1-10KB, so 100 items = ~100KB-1MB max
+CACHE_SIZE = 100 if IS_CONSTRAINED else 500
 _cache = LRUCache(max_size=CACHE_SIZE, default_ttl=120)  # Shorter TTL (2 min) to free memory faster
 
 

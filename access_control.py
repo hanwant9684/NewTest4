@@ -148,7 +148,7 @@ async def get_user_client(user_id: int):
     Get user's personal client if they have session
     
     CRITICAL: Uses SessionManager to limit concurrent sessions and prevent memory exhaustion
-    On Render/Replit (512MB RAM), limits to 5 concurrent user sessions (5 * 70MB = ~350MB)
+    On Render/Replit (512MB RAM), limits to 10 concurrent user sessions (~5-10MB each due to StringSession)
     Sessions are reused across downloads - DO NOT call client.stop() after each download!
     
     Returns:
