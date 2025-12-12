@@ -184,6 +184,7 @@ def _optimized_connection_count_upload(file_size, max_count=MAX_UPLOAD_CONNECTIO
     With this fix, same file uses 2-3 connections (~20-30MB RAM spike), staying within limits.
     
     Connection tiers (each connection uses ~10MB RAM):
+    With 10 concurrent uploads possible, we must be very conservative.
     
     CONSTRAINED (Replit/Render - 512MB RAM):
     - Files >= 1GB: 2 connections (~20MB RAM) - Prevents OOM on huge uploads
@@ -191,32 +192,26 @@ def _optimized_connection_count_upload(file_size, max_count=MAX_UPLOAD_CONNECTIO
     - Files < 50MB: 3 connections (~30MB RAM) - Faster for small files, still safe
     
     NON-CONSTRAINED (standard servers):
-    - Files >= 1GB: 3 connections (~30MB RAM) - Original safe value
-    - Files 50MB-1GB: 4 connections (~40MB RAM) - Original balanced value
-    - Files < 50MB: 6 connections (~60MB RAM) - Original fast value for small files
+    - Files >= 1GB: 3 connections (~30MB RAM)
+    - Files 50MB-1GB: 4 connections (~40MB RAM)
+    - Files < 50MB: 6 connections (~60MB RAM)
     
-    IMPORTANT: We ignore max_count parameter to prevent FastTelethon's default (20)
-    from bypassing our constraints. Always use hardcoded safe limits.
+    IMPORTANT: Uses MAX_UPLOAD_CONNECTIONS as ceiling to stay within memory limits.
     """
-    # On constrained environments (Replit, Render), use very conservative limits
     if IS_CONSTRAINED:
-        # Large files (1GB+): Absolute minimum connections
-        if file_size >= 1024 * 1024 * 1024:  # 1GB
-            return 6
-        # Medium files (50MB-1GB): Still conservative
-        elif file_size >= 50 * 1024 * 1024:  # 50MB
-            return 6
-        # Small files (< 50MB): Slightly faster but still safe
-        else:
-            return 6
+        if file_size >= 1024 * 1024 * 1024:  # 1GB+
+            return min(2, MAX_UPLOAD_CONNECTIONS)
+        elif file_size >= 50 * 1024 * 1024:  # 50MB-1GB
+            return min(2, MAX_UPLOAD_CONNECTIONS)
+        else:  # < 50MB
+            return min(3, MAX_UPLOAD_CONNECTIONS)
     else:
-        # Non-constrained environments: keep original values
-        if file_size >= 1024 * 1024 * 1024:  # 1GB
-            return 6
-        elif file_size >= 50 * 1024 * 1024:  # 50MB
-            return 6
-        else:
-            return 6
+        if file_size >= 1024 * 1024 * 1024:  # 1GB+
+            return min(3, MAX_UPLOAD_CONNECTIONS)
+        elif file_size >= 50 * 1024 * 1024:  # 50MB-1GB
+            return min(4, MAX_UPLOAD_CONNECTIONS)
+        else:  # < 50MB
+            return min(6, MAX_UPLOAD_CONNECTIONS)
 
 # Apply optimized upload connection count to FastTelethon
 ParallelTransferrer._get_connection_count = staticmethod(_optimized_connection_count_upload)
