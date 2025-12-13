@@ -61,10 +61,20 @@ class PhoneAuthHandler:
 
         except FloodWaitError as e:
             LOGGER(__name__).error(f"FloodWait error: {e}")
+            # Disconnect client to prevent memory leak
+            try:
+                await client.disconnect()
+            except:
+                pass
             return False, f"❌ **Rate limit exceeded. Please wait {e.seconds} seconds before trying again.**", None
 
         except Exception as e:
             LOGGER(__name__).error(f"Error sending OTP to {phone_number}: {e}")
+            # Disconnect client to prevent memory leak on failed login attempts
+            try:
+                await client.disconnect()
+            except:
+                pass
             return False, f"❌ **Failed to send OTP: {str(e)}**\n\nMake sure the phone number is in international format (e.g., +(91)9012345678 OR +919012345678)", None
 
     async def verify_otp(self, user_id: int, otp_code: str):

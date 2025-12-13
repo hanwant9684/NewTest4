@@ -1722,11 +1722,39 @@ if __name__ == "__main__":
     async def main():
         from queue_manager import download_manager
         from helpers.session_manager import session_manager
+        from helpers.cleanup import start_periodic_cleanup
         
         try:
             await bot.start(bot_token=PyroConf.BOT_TOKEN)
             await download_manager.start_processor()
             LOGGER(__name__).info("Download queue processor initialized")
+            
+            # Start cleanup tasks to prevent memory and disk leaks
+            phone_auth_handler.start_cleanup_task()
+            LOGGER(__name__).info("Phone auth cleanup task started")
+            
+            await session_manager.start_cleanup_task()
+            LOGGER(__name__).info("Session manager cleanup task started")
+            
+            asyncio.create_task(start_periodic_cleanup(interval_minutes=30))
+            LOGGER(__name__).info("Periodic file cleanup task started")
+            
+            async def periodic_sweep():
+                """Periodically sweep stale items from download manager"""
+                while True:
+                    try:
+                        await asyncio.sleep(1800)  # Every 30 minutes
+                        result = await download_manager.sweep_stale_items(max_age_minutes=60)
+                        if result['orphaned_tasks'] > 0 or result['expired_cooldowns'] > 0:
+                            LOGGER(__name__).info(f"Sweep completed: {result}")
+                    except asyncio.CancelledError:
+                        break
+                    except Exception as e:
+                        LOGGER(__name__).error(f"Error in periodic sweep: {e}")
+            
+            asyncio.create_task(periodic_sweep())
+            LOGGER(__name__).info("Download manager sweep task started")
+            
             LOGGER(__name__).info("Bot Started!")
             await bot.run_until_disconnected()
         except KeyboardInterrupt:

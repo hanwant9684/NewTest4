@@ -59,6 +59,12 @@ None specified yet. Add preferences as they are expressed.
         *   This prevents RAM spikes and crashes on Render by allowing Telethon and file system to fully clear internal buffers and temporary data
     *   **Cloud-Only Backup:** Simplifies backup strategy to use only GitHub for database persistence, with automatic backups every 10 minutes.
     *   **Robust Error Handling:** Includes graceful shutdown mechanisms and proper background task tracking to prevent resource leaks and errors like "Task was destroyed but it is pending!".
+    *   **Memory Leak Fixes (Dec 13, 2025):** Fixed multiple memory and disk leaks:
+        *   **Telethon Client Leak on Failed Logins:** Added `client.disconnect()` in exception handlers for `FloodWaitError` and generic exceptions in `phone_auth.py`
+        *   **Phone Auth Cleanup Task:** Now started in `main.py` to clean up stale auth sessions (each holding ~60-70MB)
+        *   **Session Manager Cleanup Task:** Now started in `main.py` to disconnect idle sessions
+        *   **Periodic File Cleanup Task:** Now started in `main.py` to remove old download files
+        *   **Download Manager Sweep Task:** Added periodic sweep to clean orphaned tasks and expired cooldowns
     *   **Paid Media Detection (Dec 2025):** Added handling for Telegram's paid/premium media (`MessageMediaPaidMedia`):
         *   Detects paid media before download attempt
         *   Attempts to extract actual media from extended_media container if accessible
