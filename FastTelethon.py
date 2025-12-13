@@ -304,7 +304,8 @@ def stream_file(file_to_stream: BinaryIO, chunk_size=1024):
 
 async def _internal_transfer_to_telegram(client: TelegramClient,
                                          response: BinaryIO,
-                                         progress_callback: callable
+                                         progress_callback: callable,
+                                         connection_count: Optional[int] = None
                                          ) -> Tuple[TypeInputFile, int]:
     file_id = helpers.generate_random_long()
     file_size = os.path.getsize(response.name)
@@ -314,7 +315,7 @@ async def _internal_transfer_to_telegram(client: TelegramClient,
 
     hash_md5 = hashlib.md5()
     uploader = ParallelTransferrer(client)
-    part_size, part_count, is_large = await uploader.init_upload(file_id, file_size)
+    part_size, part_count, is_large = await uploader.init_upload(file_id, file_size, connection_count=connection_count)
     buffer = bytearray()
     try:
         for data in stream_file(response):
@@ -350,13 +351,14 @@ async def download_file(client: TelegramClient,
                         location: TypeLocation,
                         out: BinaryIO,
                         progress_callback: callable = None,
-                        file_size: Optional[int] = None
+                        file_size: Optional[int] = None,
+                        connection_count: Optional[int] = None
                         ) -> BinaryIO:
     size = file_size if file_size is not None else location.size
     dc_id, location = utils.get_input_location(location)
     # We lock the transfers because telegram has connection count limits
     downloader = ParallelTransferrer(client, dc_id)
-    downloaded = downloader.download(location, size)
+    downloaded = downloader.download(location, size, connection_count=connection_count)
     async for x in downloaded:
         out.write(x)
         if progress_callback:
@@ -370,7 +372,7 @@ async def download_file(client: TelegramClient,
 async def upload_file(client: TelegramClient,
                       file: BinaryIO,
                       progress_callback: callable = None,
-
+                      connection_count: Optional[int] = None
                       ) -> TypeInputFile:
-    res = (await _internal_transfer_to_telegram(client, file, progress_callback))[0]
+    res = (await _internal_transfer_to_telegram(client, file, progress_callback, connection_count))[0]
     return res
