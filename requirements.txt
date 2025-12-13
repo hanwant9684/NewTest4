@@ -28,3 +28,9 @@ psutil
 Telethon
 uvloop
 waitress
+cryptg
+orjson
+psutil
+Telethon
+uvloop
+waitress

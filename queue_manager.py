@@ -149,15 +149,24 @@ class DownloadManager:
             
             try:
                 from helpers.session_manager import session_manager
-                from time import time
-                if user_id in session_manager.last_activity:
-                    session_manager.last_activity[user_id] = time()
-                    LOGGER(__name__).debug(f"Updated last_activity for user {user_id} after download completion")
+                from helpers.transfer import get_ram_usage_mb
+                
+                before_cleanup = get_ram_usage_mb()
+                await session_manager.remove_session(user_id)
+                
+                gc.collect()
+                after_cleanup = get_ram_usage_mb()
+                ram_released = before_cleanup - after_cleanup
+                
+                LOGGER(__name__).info(
+                    f"[RAM] SESSION CLEANUP: User {user_id} - "
+                    f"RAM after cleanup: {after_cleanup:.1f}MB (released: {ram_released:.1f}MB)"
+                )
             except Exception as e:
-                LOGGER(__name__).debug(f"Could not update last_activity after download: {e}")
+                LOGGER(__name__).debug(f"Could not cleanup session after download: {e}")
+                gc.collect()
             
-            gc.collect()
-            LOGGER(__name__).info(f"Download completed for user {user_id}. Active: {len(self.active_downloads)}. GC triggered.")
+            LOGGER(__name__).info(f"Download completed for user {user_id}. Active: {len(self.active_downloads)}. Session+GC cleanup done.")
             
             try:
                 user_type = db.get_user_type(user_id)
