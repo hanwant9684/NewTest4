@@ -96,6 +96,21 @@ class LRUCache:
             'misses': self.misses,
             'hit_rate': f"{hit_rate:.1f}%"
         }
+    
+    def cleanup_expired(self) -> int:
+        """Proactively remove all expired entries from cache"""
+        current_time = time.time()
+        keys_to_delete = [
+            key for key, entry in self.cache.items()
+            if current_time > entry['expires_at']
+        ]
+        for key in keys_to_delete:
+            del self.cache[key]
+        
+        if keys_to_delete:
+            LOGGER(__name__).info(f"Cache cleanup: removed {len(keys_to_delete)} expired entries, {len(self.cache)} remaining")
+        
+        return len(keys_to_delete)
 
 
 # Global cache instance

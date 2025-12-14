@@ -1301,6 +1301,14 @@ async def cleanup_watchdog_task():
             except Exception as e:
                 LOGGER(__name__).error(f"Error in download cleanup: {e}")
             
+            # Clean up expired cache entries
+            try:
+                from cache import get_cache
+                cache = get_cache()
+                expired_count = cache.cleanup_expired()
+            except Exception as e:
+                LOGGER(__name__).error(f"Error in cache cleanup: {e}")
+            
             # Log memory snapshot after cleanup
             from memory_monitor import memory_monitor
             memory_monitor.log_memory_snapshot("Cleanup Watchdog", "After cleanup sweep", silent=True)
