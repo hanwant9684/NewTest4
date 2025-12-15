@@ -38,7 +38,6 @@ class DownloadSender:
     request: GetFileRequest
     remaining: int
     stride: int
-    _lock: asyncio.Lock  # Prevent concurrent reads on same sender
 
     def __init__(self, client: TelegramClient, sender: MTProtoSender, file: TypeLocation, offset: int, limit: int,
                  stride: int, count: int) -> None:
@@ -47,33 +46,31 @@ class DownloadSender:
         self.request = GetFileRequest(file, offset=offset, limit=limit)
         self.stride = stride
         self.remaining = count
-        self._lock = asyncio.Lock()  # Initialize lock per sender
 
     async def next(self) -> Optional[bytes]:
-        async with self._lock:  # Serialize access to this sender
-            if not self.remaining:
-                return None
-            max_retries = 3
-            for attempt in range(max_retries):
-                try:
-                    result = await self.client._call(self.sender, self.request)
-                    self.remaining -= 1
-                    self.request.offset += self.stride
-                    return result.bytes
-                except Exception as e:
-                    error_str = str(e).lower()
-                    if 'flood' in error_str or '420' in str(type(e).__name__):
-                        import re
-                        wait_match = re.search(r'(\d+)', str(e))
-                        wait_time = int(wait_match.group(1)) if wait_match else 5
-                        wait_time = min(wait_time, 30)
-                        log.warning(f"FLOOD_WAIT detected, waiting {wait_time}s (attempt {attempt+1}/{max_retries})")
-                        await asyncio.sleep(wait_time)
-                        if attempt == max_retries - 1:
-                            raise
-                    else:
-                        raise
+        if not self.remaining:
             return None
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                result = await self.client._call(self.sender, self.request)
+                self.remaining -= 1
+                self.request.offset += self.stride
+                return result.bytes
+            except Exception as e:
+                error_str = str(e).lower()
+                if 'flood' in error_str or '420' in str(type(e).__name__):
+                    import re
+                    wait_match = re.search(r'(\d+)', str(e))
+                    wait_time = int(wait_match.group(1)) if wait_match else 5
+                    wait_time = min(wait_time, 30)
+                    log.warning(f"FLOOD_WAIT detected, waiting {wait_time}s (attempt {attempt+1}/{max_retries})")
+                    await asyncio.sleep(wait_time)
+                    if attempt == max_retries - 1:
+                        raise
+                else:
+                    raise
+        return None
 
     def disconnect(self) -> Awaitable[None]:
         return self.sender.disconnect()
@@ -82,56 +79,41 @@ class DownloadSender:
 class UploadSender:
     client: TelegramClient
     sender: MTProtoSender
-    file_id: int
+    request: Union[SaveFilePartRequest, SaveBigFilePartRequest]
     part_count: int
-    big: bool
-    current_part: int
     stride: int
-    pending: List[asyncio.Task]
+    previous: Optional[asyncio.Task]
     loop: asyncio.AbstractEventLoop
-    max_pending: int
 
     def __init__(self, client: TelegramClient, sender: MTProtoSender, file_id: int, part_count: int, big: bool,
                  index: int,
                  stride: int, loop: asyncio.AbstractEventLoop) -> None:
         self.client = client
         self.sender = sender
-        self.file_id = file_id
         self.part_count = part_count
-        self.big = big
-        self.current_part = index
+        if big:
+            self.request = SaveBigFilePartRequest(file_id, index, part_count, b"")
+        else:
+            self.request = SaveFilePartRequest(file_id, index, b"")
         self.stride = stride
-        self.pending = []
+        self.previous = None
         self.loop = loop
-        self.max_pending = 4
 
     async def next(self, data: bytes) -> None:
-        while len(self.pending) >= self.max_pending:
-            done = [t for t in self.pending if t.done()]
-            for t in done:
-                self.pending.remove(t)
-                try:
-                    await t
-                except Exception:
-                    pass
-            if len(self.pending) >= self.max_pending:
-                await asyncio.sleep(0.01)
-        part_num = self.current_part
-        self.current_part += self.stride
-        self.pending.append(self.loop.create_task(self._next(data, part_num)))
+        if self.previous:
+            await self.previous
+        self.previous = self.loop.create_task(self._next(data))
 
-    async def _next(self, data: bytes, part_num: int) -> None:
-        if self.big:
-            request = SaveBigFilePartRequest(self.file_id, part_num, self.part_count, data)
-        else:
-            request = SaveFilePartRequest(self.file_id, part_num, data)
-        log.debug(f"Sending file part {part_num}/{self.part_count} with {len(data)} bytes")
-        await self.client._call(self.sender, request)
+    async def _next(self, data: bytes) -> None:
+        self.request.bytes = data
+        log.debug(f"Sending file part {self.request.file_part}/{self.part_count}"
+                  f" with {len(data)} bytes")
+        await self.client._call(self.sender, self.request)
+        self.request.file_part += self.stride
 
     async def disconnect(self) -> None:
-        if self.pending:
-            await asyncio.gather(*self.pending, return_exceptions=True)
-            self.pending.clear()
+        if self.previous:
+            await self.previous
         return await self.sender.disconnect()
 
 
@@ -340,8 +322,7 @@ def stream_file(file_to_stream: BinaryIO, chunk_size=1024):
 async def _internal_transfer_to_telegram(client: TelegramClient,
                                          response: BinaryIO,
                                          progress_callback: callable,
-                                         connection_count: Optional[int] = None,
-                                         part_size_kb: Optional[float] = None
+                                         connection_count: Optional[int] = None
                                          ) -> Tuple[TypeInputFile, int]:
     file_id = helpers.generate_random_long()
     file_size = os.path.getsize(response.name)
@@ -351,7 +332,7 @@ async def _internal_transfer_to_telegram(client: TelegramClient,
 
     hash_md5 = hashlib.md5()
     uploader = ParallelTransferrer(client)
-    part_size, part_count, is_large = await uploader.init_upload(file_id, file_size, part_size_kb=part_size_kb, connection_count=connection_count)
+    part_size, part_count, is_large = await uploader.init_upload(file_id, file_size, connection_count=connection_count)
     buffer = bytearray()
     try:
         for data in stream_file(response):
@@ -388,14 +369,13 @@ async def download_file(client: TelegramClient,
                         out: BinaryIO,
                         progress_callback: callable = None,
                         file_size: Optional[int] = None,
-                        connection_count: Optional[int] = None,
-                        part_size_kb: Optional[float] = None
+                        connection_count: Optional[int] = None
                         ) -> BinaryIO:
     size = file_size if file_size is not None else location.size
     dc_id, location = utils.get_input_location(location)
     # We lock the transfers because telegram has connection count limits
     downloader = ParallelTransferrer(client, dc_id)
-    downloaded = downloader.download(location, size, part_size_kb=part_size_kb, connection_count=connection_count)
+    downloaded = downloader.download(location, size, connection_count=connection_count)
     async for x in downloaded:
         out.write(x)
         if progress_callback:
@@ -409,8 +389,7 @@ async def download_file(client: TelegramClient,
 async def upload_file(client: TelegramClient,
                       file: BinaryIO,
                       progress_callback: callable = None,
-                      connection_count: Optional[int] = None,
-                      part_size_kb: Optional[float] = None
+                      connection_count: Optional[int] = None
                       ) -> TypeInputFile:
-    res = (await _internal_transfer_to_telegram(client, file, progress_callback, connection_count, part_size_kb))[0]
+    res = (await _internal_transfer_to_telegram(client, file, progress_callback, connection_count))[0]
     return res

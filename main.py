@@ -8,16 +8,16 @@ from time import time
 from attribution import verify_attribution, get_channel_link, get_creator_username
 
 try:
-    import uvloop  # type: ignore
+    import uvloop
     # Only set uvloop policy if not already set (prevents overwriting thread-local loops)
     if not isinstance(asyncio.get_event_loop_policy(), uvloop.EventLoopPolicy):
         asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 except ImportError:
     pass
 
-from telethon import TelegramClient, events  # type: ignore
-from telethon.errors import PeerIdInvalidError, BadRequestError  # type: ignore
-from telethon.sessions import StringSession  # type: ignore
+from telethon import TelegramClient, events
+from telethon.errors import PeerIdInvalidError, BadRequestError
+from telethon.sessions import StringSession
 from telethon_helpers import InlineKeyboardButton, InlineKeyboardMarkup, parse_command, get_command_args
 
 from helpers.utils import (
@@ -754,7 +754,7 @@ async def download_range(event):
     # Try to resolve the channel entity first (same fallback as handle_download)
     try:
         LOGGER(__name__).debug(f"Batch download: Resolving entity for channel: {start_chat}")
-        entity = await client_to_use.get_entity(start_chat)  # type: ignore
+        entity = await client_to_use.get_entity(start_chat)
         LOGGER(__name__).debug(f"Batch download: Resolved entity for channel: {start_chat}")
     except ValueError as e:
         LOGGER(__name__).error(f"Batch download: Cannot find entity {start_chat}: {e}")
@@ -765,14 +765,14 @@ async def download_range(event):
             status_msg = await event.respond("🔄 **Loading your channels... Please wait.**")
             
             # Get all dialogs (chats/channels) - this populates Telethon's entity cache
-            dialogs = await client_to_use.get_dialogs(limit=None)  # type: ignore
+            dialogs = await client_to_use.get_dialogs(limit=None)
             LOGGER(__name__).debug(f"Batch download: Loaded {len(dialogs)} dialogs")
             
             await status_msg.delete()
             
             # Try again after loading dialogs
             try:
-                entity = await client_to_use.get_entity(start_chat)  # type: ignore
+                entity = await client_to_use.get_entity(start_chat)
                 LOGGER(__name__).debug(f"Batch download: Resolved entity after loading dialogs")
             except Exception as retry_error:
                 LOGGER(__name__).error(f"Batch download: Still cannot resolve entity after loading dialogs: {retry_error}")
@@ -829,7 +829,7 @@ async def download_range(event):
                 session_manager.last_activity[event.sender_id] = time()
             
             try:
-                chat_msg = await client_to_use.get_messages(start_chat, ids=msg_id)  # type: ignore
+                chat_msg = await client_to_use.get_messages(start_chat, ids=msg_id)
                 if not chat_msg:
                     LOGGER(__name__).debug(f"Batch: msg {msg_id} not found")
                     skipped += 1

@@ -85,39 +85,23 @@ class PyroConf:
     
     # Connection Pool Configuration for Multi-User Downloads
     # These settings control how FastTelethon allocates connections across concurrent users
-    # Total pool of Telegram connections (default: 200)
-    # High value since RAM is not a constraint
+    # Total pool of Telegram connections (default: 96, max ~100 per account)
     try:
-        TOTAL_FASTTELETHON_CONNECTIONS = int(os.getenv("TOTAL_FASTTELETHON_CONNECTIONS", "200"))
+        TOTAL_FASTTELETHON_CONNECTIONS = int(os.getenv("TOTAL_FASTTELETHON_CONNECTIONS", "96"))
     except ValueError:
-        TOTAL_FASTTELETHON_CONNECTIONS = 200
+        TOTAL_FASTTELETHON_CONNECTIONS = 96
     
-    # Minimum connections per transfer (default: 16) - ensures minimum speed
+    # Minimum connections per transfer (default: 6) - ensures minimum speed
     try:
-        MIN_CONNECTIONS_PER_TRANSFER = int(os.getenv("MIN_CONNECTIONS_PER_TRANSFER", "16"))
+        MIN_CONNECTIONS_PER_TRANSFER = int(os.getenv("MIN_CONNECTIONS_PER_TRANSFER", "6"))
     except ValueError:
-        MIN_CONNECTIONS_PER_TRANSFER = 16
+        MIN_CONNECTIONS_PER_TRANSFER = 6
     
-    # Maximum connections per transfer (default: 64) - caps per-user resources
-    # Aggressive value for maximum single-user speed
+    # Maximum connections per transfer (default: 16) - caps per-user resources
     try:
-        MAX_CONNECTIONS_PER_TRANSFER = int(os.getenv("MAX_CONNECTIONS_PER_TRANSFER", "64"))
+        MAX_CONNECTIONS_PER_TRANSFER = int(os.getenv("MAX_CONNECTIONS_PER_TRANSFER", "16"))
     except ValueError:
-        MAX_CONNECTIONS_PER_TRANSFER = 64
-    
-    # Chunk size for downloads in KB (default: 512 - MTProto max limit)
-    # 512KB is the maximum allowed by Telegram's MTProto protocol
-    try:
-        DOWNLOAD_CHUNK_SIZE_KB = int(os.getenv("DOWNLOAD_CHUNK_SIZE_KB", "512"))
-    except ValueError:
-        DOWNLOAD_CHUNK_SIZE_KB = 512
-    
-    # Chunk size for uploads in KB (default: 512 - MTProto max limit)
-    # 512KB is the maximum allowed by Telegram's MTProto protocol
-    try:
-        UPLOAD_CHUNK_SIZE_KB = int(os.getenv("UPLOAD_CHUNK_SIZE_KB", "512"))
-    except ValueError:
-        UPLOAD_CHUNK_SIZE_KB = 512
+        MAX_CONNECTIONS_PER_TRANSFER = 16
     
     @staticmethod
     def get_app_url() -> str:
