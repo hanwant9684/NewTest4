@@ -6,16 +6,24 @@ This module implements a global connection budget allocator that ensures
 fair bandwidth distribution across multiple concurrent users.
 
 KEY FEATURES:
-- Global connection pool (default 96 connections total)
-- Dynamic allocation: 8-16 connections per transfer based on active users
-- Fair bandwidth distribution: ~10-15MB/s per user with up to 10 concurrent users
+- Global connection pool (default 200 connections total)
+- Dynamic allocation: 16-64 connections per transfer based on active users
+- Aggressive upload pipelining (4 pending requests per connection)
 - FLOOD_WAIT handling to prevent Telegram rate limiting
 - Automatic rebalancing when users join/leave
 
 CONFIGURATION (Environment Variables):
-- TOTAL_FASTTELETHON_CONNECTIONS: Total connection pool (default: 96)
-- MIN_CONNECTIONS_PER_TRANSFER: Minimum connections per download (default: 6)
-- MAX_CONNECTIONS_PER_TRANSFER: Maximum connections per download (default: 16)
+- TOTAL_FASTTELETHON_CONNECTIONS: Total connection pool (default: 200)
+- MIN_CONNECTIONS_PER_TRANSFER: Minimum connections per download (default: 16)
+- MAX_CONNECTIONS_PER_TRANSFER: Maximum connections per download (default: 64)
+- DOWNLOAD_CHUNK_SIZE_KB: Chunk size for downloads in KB (default: 512 - MTProto max)
+- UPLOAD_CHUNK_SIZE_KB: Chunk size for uploads in KB (default: 512 - MTProto max)
+
+PERFORMANCE NOTES:
+- With 64 connections, expect ~20-40MB/s for single user downloads
+- With 2 concurrent users, expect ~15-25MB/s per user
+- Uploads improved with pipelining (4x faster than sequential)
+- MTProto hard limit is 512KB chunks - cannot be increased
 """
 import os
 import asyncio
@@ -29,9 +37,12 @@ from telethon.tl.types import Message, Document, TypeMessageMedia, InputPhotoFil
 from logger import LOGGER
 from FastTelethon import download_file as fast_download, upload_file as fast_upload, ParallelTransferrer
 
-TOTAL_CONNECTIONS = int(os.getenv("TOTAL_FASTTELETHON_CONNECTIONS", "96"))
-MIN_CONNECTIONS_PER_TRANSFER = int(os.getenv("MIN_CONNECTIONS_PER_TRANSFER", "6"))
-MAX_CONNECTIONS_PER_TRANSFER = int(os.getenv("MAX_CONNECTIONS_PER_TRANSFER", "16"))
+TOTAL_CONNECTIONS = int(os.getenv("TOTAL_FASTTELETHON_CONNECTIONS", "200"))
+MIN_CONNECTIONS_PER_TRANSFER = int(os.getenv("MIN_CONNECTIONS_PER_TRANSFER", "16"))
+MAX_CONNECTIONS_PER_TRANSFER = int(os.getenv("MAX_CONNECTIONS_PER_TRANSFER", "64"))
+
+DOWNLOAD_CHUNK_SIZE_KB = int(os.getenv("DOWNLOAD_CHUNK_SIZE_KB", "512"))
+UPLOAD_CHUNK_SIZE_KB = int(os.getenv("UPLOAD_CHUNK_SIZE_KB", "512"))
 
 class ConnectionAllocator:
     """
@@ -291,6 +302,7 @@ async def download_media_fast(
             
             if media_location and file_size > 0:
                 import gc
+                chunk_size_kb = DOWNLOAD_CHUNK_SIZE_KB if file_size > 10 * 1024 * 1024 else None
                 with open(file, 'wb') as f:
                     await fast_download(
                         client=client,
@@ -298,7 +310,8 @@ async def download_media_fast(
                         out=f,
                         progress_callback=ram_callback,
                         file_size=file_size,
-                        connection_count=connection_count
+                        connection_count=connection_count,
+                        part_size_kb=chunk_size_kb
                     )
                 end_ram = get_ram_usage_mb()
                 LOGGER(__name__).info(f"[RAM] DOWNLOAD COMPLETE: {file_name} - RAM before GC: {end_ram:.1f}MB")
@@ -346,12 +359,14 @@ async def upload_media_fast(
             
             ram_callback = create_ram_logging_callback(progress_callback, file_size, "UPLOAD", file_name)
             
+            chunk_size_kb = UPLOAD_CHUNK_SIZE_KB if file_size > 10 * 1024 * 1024 else None
             file_handle = open(file_path, 'rb')
             result = await fast_upload(
                 client=client,
                 file=file_handle,
                 progress_callback=ram_callback,
-                connection_count=connection_count
+                connection_count=connection_count,
+                part_size_kb=chunk_size_kb
             )
             
             end_ram = get_ram_usage_mb()
