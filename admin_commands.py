@@ -160,89 +160,89 @@ async def unban_user_command(event):
 
 @admin_only
 async def broadcast_command(event):
-    """Broadcast message/media to all users
+    """Broadcast message/media to all users or specific users
     
     Usage:
-    - Text: /broadcast <message>
-    - Media: Reply to a photo/video/audio/document/GIF with /broadcast <optional caption>
+    - All users: /broadcast <message>
+    - Specific users: /broadcast @user_id1,user_id2 <message>
+    - Media: Reply to a photo/video/audio/document/GIF with /broadcast [@user_ids] <optional caption>
     """
     try:
         broadcast_data = {}
+        target_user_ids = None
         
         replied_msg = await event.get_reply_message()
+        args = get_command_args(event.text)
+        
+        if len(args) > 0 and args[0].startswith('@'):
+            user_ids_str = args[0][1:]
+            if user_ids_str and all(c.isdigit() or c == ',' for c in user_ids_str):
+                try:
+                    target_user_ids = [int(uid.strip()) for uid in user_ids_str.split(',') if uid.strip()]
+                except ValueError:
+                    pass
         
         if replied_msg:
             caption = None
-            args = get_command_args(event.text)
-            if len(args) > 0:
+            if target_user_ids and len(args) > 1:
+                caption = event.text.split(' ', 2)[2] if len(event.text.split(' ', 2)) > 2 else None
+            elif not target_user_ids and len(args) > 0:
                 caption = event.text.split(' ', 1)[1]
             elif replied_msg.text:
                 caption = replied_msg.text
             
             if replied_msg.photo:
-                broadcast_data = {
-                    'type': 'photo',
-                    'file': replied_msg.photo,
-                    'caption': caption
-                }
+                broadcast_data = {'type': 'photo', 'file': replied_msg.photo, 'caption': caption}
             elif replied_msg.video:
-                broadcast_data = {
-                    'type': 'video',
-                    'file': replied_msg.video,
-                    'caption': caption
-                }
+                broadcast_data = {'type': 'video', 'file': replied_msg.video, 'caption': caption}
             elif replied_msg.audio:
-                broadcast_data = {
-                    'type': 'audio',
-                    'file': replied_msg.audio,
-                    'caption': caption
-                }
+                broadcast_data = {'type': 'audio', 'file': replied_msg.audio, 'caption': caption}
             elif replied_msg.voice:
-                broadcast_data = {
-                    'type': 'voice',
-                    'file': replied_msg.voice,
-                    'caption': caption
-                }
+                broadcast_data = {'type': 'voice', 'file': replied_msg.voice, 'caption': caption}
             elif replied_msg.document:
                 if replied_msg.gif:
-                    broadcast_data = {
-                        'type': 'animation',
-                        'file': replied_msg.document,
-                        'caption': caption
-                    }
+                    broadcast_data = {'type': 'animation', 'file': replied_msg.document, 'caption': caption}
                 else:
-                    broadcast_data = {
-                        'type': 'document',
-                        'file': replied_msg.document,
-                        'caption': caption
-                    }
+                    broadcast_data = {'type': 'document', 'file': replied_msg.document, 'caption': caption}
             elif replied_msg.sticker:
-                broadcast_data = {
-                    'type': 'sticker',
-                    'file': replied_msg.sticker,
-                    'caption': None
-                }
+                broadcast_data = {'type': 'sticker', 'file': replied_msg.sticker, 'caption': None}
             else:
                 await event.respond("❌ **Unsupported media type or no media found in the replied message.**")
                 return
         else:
-            args = get_command_args(event.text)
             if len(args) < 1:
                 await event.respond(
                     "**📢 Broadcast Usage:**\n\n"
-                    "**Text:** `/broadcast <message>`\n"
-                    "**Media:** Reply to a photo/video/audio/document/GIF with `/broadcast <optional caption>`\n\n"
+                    "**To All Users:**\n"
+                    "• `/broadcast <message>`\n"
+                    "• Reply to media: `/broadcast <optional caption>`\n\n"
+                    "**To Specific Users:**\n"
+                    "• `/broadcast @123456789 <message>`\n"
+                    "• `/broadcast @123456789,987654321 <message>`\n"
+                    "• Reply to media: `/broadcast @123456789 <caption>`\n\n"
                     "**Examples:**\n"
-                    "• `/broadcast Hello everyone! New features available.`\n"
-                    "• Reply to a photo: `/broadcast Check out this new update!`\n"
-                    "• Reply to a video (no caption): `/broadcast`"
+                    "• `/broadcast Hello everyone!` → All users\n"
+                    "• `/broadcast @123456789 Hi there!` → One user\n"
+                    "• `/broadcast @123,456,789 Notice!` → Multiple users"
                 )
                 return
             
-            broadcast_data = {
-                'type': 'text',
-                'message': event.text.split(' ', 1)[1]
-            }
+            if target_user_ids:
+                if len(args) < 2:
+                    await event.respond("❌ **Please provide a message after the user ID(s).**")
+                    return
+                message_text = event.text.split(' ', 2)[2] if len(event.text.split(' ', 2)) > 2 else ""
+            else:
+                message_text = event.text.split(' ', 1)[1]
+            
+            if not message_text:
+                await event.respond("❌ **Please provide a message to send.**")
+                return
+            
+            broadcast_data = {'type': 'text', 'message': message_text}
+        
+        if target_user_ids:
+            broadcast_data['target_users'] = target_user_ids
         
         if broadcast_data['type'] == 'text':
             preview = broadcast_data['message'][:100] + "..." if len(broadcast_data['message']) > 100 else broadcast_data['message']
@@ -254,6 +254,15 @@ async def broadcast_command(event):
                 caption_preview = caption_preview[:100] + "..."
             preview_text = f"**📢 Broadcast Preview ({media_type}):**\n\n{caption_preview or 'No caption'}"
         
+        if target_user_ids:
+            user_count = len(target_user_ids)
+            user_list = ', '.join([f"`{uid}`" for uid in target_user_ids[:5]])
+            if user_count > 5:
+                user_list += f" ... +{user_count - 5} more"
+            target_text = f"**Target ({user_count} users):** {user_list}"
+        else:
+            target_text = "**Target:** All users"
+        
         confirm_markup = InlineKeyboardMarkup([
             [
                 InlineKeyboardButton.callback("✅ Send Broadcast", f"broadcast_confirm:{event.sender_id}"),
@@ -262,8 +271,7 @@ async def broadcast_command(event):
         ])
         
         await event.respond(
-            f"{preview_text}\n\n"
-            f"**Are you sure you want to send this to all users?**",
+            f"{preview_text}\n\n{target_text}\n\n**Confirm sending?**",
             buttons=confirm_markup.to_telethon()
         )
         
@@ -274,9 +282,15 @@ async def broadcast_command(event):
         LOGGER(__name__).error(f"Error in broadcast_command: {e}")
 
 async def execute_broadcast(client, admin_id: int, broadcast_data: dict):
-    """Execute the actual broadcast - supports text and all media types"""
-    all_users = db.get_all_users()
-    total_users = len(all_users)
+    """Execute the actual broadcast - supports text and all media types, to all or specific users"""
+    target_users = broadcast_data.get('target_users')
+    
+    if target_users:
+        users_to_send = target_users
+    else:
+        users_to_send = db.get_all_users()
+    
+    total_users = len(users_to_send)
     successful_sends = 0
 
     if total_users == 0:
@@ -284,7 +298,7 @@ async def execute_broadcast(client, admin_id: int, broadcast_data: dict):
 
     broadcast_type = broadcast_data.get('type', 'text')
     
-    for user_id in all_users:
+    for user_id in users_to_send:
         try:
             if broadcast_type == 'text':
                 await client.send_message(user_id, broadcast_data['message'])

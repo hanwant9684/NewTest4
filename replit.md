@@ -98,6 +98,14 @@ None specified yet. Add preferences as they are expressed.
 -   `session_manager.py`: Manages user session lifecycles.
 -   `cloud_backup.py`: Implements the GitHub-based database backup system.
 -   `legal_acceptance.py`: Manages the legal terms acceptance process.
+-   `admin_commands.py`: Admin commands including broadcast and targeted messaging.
+
+### Admin Commands
+-   `/broadcast <message>` - Send message to all users OR specific users
+    -   All users: `/broadcast Hello everyone!`
+    -   Single user: `/broadcast @123456789 Hello!`
+    -   Multiple users: `/broadcast @123456789,987654321 Important notice!`
+    -   Media: Reply to photo/video/document with `/broadcast [@user_ids] <optional caption>`
 
 ## External Dependencies
 
