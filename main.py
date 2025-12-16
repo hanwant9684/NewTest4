@@ -264,7 +264,7 @@ async def help_command(event):
             "💡 **Your Benefits:**\n"
             "   ✅ Unlimited downloads\n"
             "   ✅ Priority access\n"
-            "   ✅ Batch download (up to 100 posts)\n"
+            "   ✅ Batch download (up to 20 posts)\n"
             "   ✅ No daily limits"
         )
     else:
@@ -711,12 +711,12 @@ async def download_range(event):
     if start_id > end_id:
         return await event.respond("**❌ Invalid range: start ID cannot exceed end ID.**")
     
-    # Limit batch to 100 posts at a time
+    # Limit batch to 20 posts at a time
     batch_count = end_id - start_id + 1
-    if batch_count > 100:
+    if batch_count > 20:
         return await event.respond(
             f"**❌ Batch limit exceeded!**\n\n"
-            f"You requested `{batch_count}` posts, but the maximum is **100 posts** at a time.\n\n"
+            f"You requested `{batch_count}` posts, but the maximum is **20 posts** at a time.\n\n"
             f"Please reduce your range and try again."
         )
 
