@@ -83,25 +83,13 @@ class PyroConf:
     except ValueError:
         FREE_INTRA_DELAY = 15
     
-    # Connection Pool Configuration for Multi-User Downloads
-    # These settings control how FastTelethon allocates connections across concurrent users
-    # Total pool of Telegram connections (default: 96, max ~100 per account)
+    # Connection Configuration for Transfers
+    # Since each user has their own session, no global pooling is needed
+    # Each transfer can use up to this many connections (default: 16)
     try:
-        TOTAL_FASTTELETHON_CONNECTIONS = int(os.getenv("TOTAL_FASTTELETHON_CONNECTIONS", "96"))
+        CONNECTIONS_PER_TRANSFER = int(os.getenv("CONNECTIONS_PER_TRANSFER", "16"))
     except ValueError:
-        TOTAL_FASTTELETHON_CONNECTIONS = 96
-    
-    # Minimum connections per transfer (default: 6) - ensures minimum speed
-    try:
-        MIN_CONNECTIONS_PER_TRANSFER = int(os.getenv("MIN_CONNECTIONS_PER_TRANSFER", "6"))
-    except ValueError:
-        MIN_CONNECTIONS_PER_TRANSFER = 6
-    
-    # Maximum connections per transfer (default: 16) - caps per-user resources
-    try:
-        MAX_CONNECTIONS_PER_TRANSFER = int(os.getenv("MAX_CONNECTIONS_PER_TRANSFER", "16"))
-    except ValueError:
-        MAX_CONNECTIONS_PER_TRANSFER = 16
+        CONNECTIONS_PER_TRANSFER = 16
     
     @staticmethod
     def get_app_url() -> str:

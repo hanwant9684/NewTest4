@@ -146,9 +146,8 @@ class ParallelTransferrer:
     @staticmethod
     def _get_connection_count(file_size: int, max_count: int = 20,
                               full_size: int = 100 * 1024 * 1024) -> int:
-        # FIXED: Always use max connections for consistent speed
-        # Small files benefit from parallel connections just as much as large files
-        # The caller (ConnectionAllocator) already manages the global pool
+        # Each user has their own session, so each transfer can use full connection capacity
+        # This method is monkeypatched by helpers/transfer.py with size-aware logic
         if file_size <= 0:
             return max(6, max_count // 2)  # Safe fallback for unknown size
         return max_count

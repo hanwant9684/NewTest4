@@ -44,15 +44,9 @@ None specified yet. Add preferences as they are expressed.
     *   **Two-Step Verification:** Employs a landing page with a "Get Verification Code" button for ad verification.
 
 4.  **System Stability & Optimization:**
-    *   **Global Connection Budget Allocator (Dec 2025):** Implemented smart connection allocation for multi-user downloads:
-        *   **Problem:** When 3-4 users download simultaneously with 20 connections each (60-80 total), they exceed Telegram's ~100 connection limit, causing speeds to drop to ~1MB/s.
-        *   **Solution:** `ConnectionAllocator` class in `helpers/transfer.py` manages a global pool of 96 connections (configurable) and dynamically allocates 6-16 connections per transfer based on active users.
-        *   **Fair Distribution:** With 10 concurrent users, each gets ~9-10 connections, maintaining ~10-15MB/s per user.
-        *   **FLOOD_WAIT Handling:** Added retry logic with backoff in `FastTelethon.py` to handle Telegram rate limiting gracefully.
+    *   **Per-User Session Transfers (Dec 2025):** Since each user authenticates with their own Telegram session, no global connection pooling is needed. Each user's session can independently use full connection capacity without affecting others.
         *   **Environment Variables:**
-            *   `TOTAL_FASTTELETHON_CONNECTIONS` (default: 96) - Total connection pool
-            *   `MIN_CONNECTIONS_PER_TRANSFER` (default: 6) - Minimum connections per download
-            *   `MAX_CONNECTIONS_PER_TRANSFER` (default: 16) - Maximum connections per download
+            *   `CONNECTIONS_PER_TRANSFER` (default: 16) - Connections per download/upload
     *   **RAM Optimization:** Implemented comprehensive memory optimizations including tiered connection scaling, asynchronous background tasks (using `asyncio.create_task`), and optimized data structures for memory monitoring.
     *   **CRITICAL: Upload Connection Limiting (Nov 13, 2025):** Fixed critical memory leak that caused crashes on Render (512MB RAM) during 90MB file uploads:
         *   **Problem:** FastTelethon was spawning 18 parallel upload connections for 90MB files, causing >120MB RAM spike at upload start, exhausting available memory and crashing the bot.
