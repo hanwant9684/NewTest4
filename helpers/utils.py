@@ -121,10 +121,53 @@ async def has_video_stream(video_path):
         return False, None, str(e)
 
 
+async def create_placeholder_thumbnail(thumb_path, width=320, height=240):
+    """
+    Create a simple placeholder image as last resort fallback.
+    Uses solid color with video icon text - very fast and reliable.
+    """
+    proc = None
+    try:
+        cmd = [
+            "ffmpeg", "-y", "-f", "lavfi", "-i",
+            f"color=c=0x1a1a2e:s={width}x{height}:d=1",
+            "-frames:v", "1", thumb_path
+        ]
+        proc = await create_subprocess_exec(*cmd, stdout=PIPE, stderr=PIPE)
+        
+        try:
+            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=5.0)
+        except asyncio.TimeoutError:
+            if proc:
+                try:
+                    proc.kill()
+                    await asyncio.wait_for(proc.wait(), timeout=2.0)
+                except:
+                    pass
+            return None
+        
+        if proc.returncode == 0 and os.path.exists(thumb_path):
+            if os.path.getsize(thumb_path) > 0:
+                LOGGER(__name__).debug(f"Placeholder thumbnail created")
+                return thumb_path
+        return None
+    except Exception as e:
+        LOGGER(__name__).debug(f"Placeholder creation failed: {e}")
+        return None
+    finally:
+        if proc and proc.returncode is None:
+            try:
+                proc.kill()
+                await asyncio.wait_for(proc.wait(), timeout=2.0)
+            except:
+                pass
+
+
 async def generate_thumbnail(video_path, thumb_path=None, duration=None):
     """
     Generate a thumbnail from a video file using ffmpeg.
-    Multi-pass approach with proper resource cleanup to prevent hangs and leaks.
+    Multi-strategy approach with position-based extraction and smart fallback.
+    Covers virtually all video files with graceful degradation.
     
     Args:
         video_path: Path to the video file
@@ -157,37 +200,58 @@ async def generate_thumbnail(video_path, thumb_path=None, duration=None):
     if file_size > 500 * 1024 * 1024:
         base_timeout = 30.0
     
-    seek_time = 0
+    seek_positions = [0]
     if duration and duration > 1:
-        seek_time = min(max(1, int(duration // 4)), 5)
+        seek_positions = [
+            0,
+            int(duration * 0.25),
+            int(duration * 0.5),
+            int(duration * 0.75)
+        ]
     
-    strategies = [
-        {
-            "name": "standard",
-            "cmd": [
-                "ffmpeg", "-y", "-ss", str(seek_time), "-i", video_path,
-                "-vframes", "1", "-vf", "scale=320:-1", "-q:v", "5", thumb_path
-            ],
-            "timeout": base_timeout
-        },
-        {
-            "name": "thumbnail_filter",
-            "cmd": [
-                "ffmpeg", "-y", "-i", video_path,
-                "-vf", "thumbnail,scale=320:-1", "-frames:v", "1", "-q:v", "5", thumb_path
-            ],
-            "timeout": base_timeout * 1.5
-        },
-        {
-            "name": "first_frame",
-            "cmd": [
-                "ffmpeg", "-y", "-analyzeduration", "20M", "-probesize", "20M",
-                "-i", video_path, "-ss", "0", "-vframes", "1",
-                "-vf", "scale=320:-1", "-q:v", "5", thumb_path
-            ],
-            "timeout": base_timeout * 2
-        }
-    ]
+    strategies = []
+    
+    for pos_idx, seek_time in enumerate(seek_positions):
+        for strategy_type in ["standard", "thumbnail_filter", "first_frame"]:
+            if strategy_type == "standard":
+                strategies.append({
+                    "name": f"standard_pos{pos_idx}",
+                    "cmd": [
+                        "ffmpeg", "-y", "-ss", str(seek_time), "-i", video_path,
+                        "-vframes", "1", "-vf", "scale=320:-1", "-q:v", "5", thumb_path
+                    ],
+                    "timeout": base_timeout
+                })
+            elif strategy_type == "thumbnail_filter":
+                if pos_idx == 0:
+                    strategies.append({
+                        "name": "thumbnail_filter",
+                        "cmd": [
+                            "ffmpeg", "-y", "-i", video_path,
+                            "-vf", "thumbnail,scale=320:-1", "-frames:v", "1", "-q:v", "5", thumb_path
+                        ],
+                        "timeout": base_timeout * 1.5
+                    })
+            elif strategy_type == "first_frame":
+                if pos_idx == 0:
+                    strategies.append({
+                        "name": "first_frame",
+                        "cmd": [
+                            "ffmpeg", "-y", "-analyzeduration", "20M", "-probesize", "20M",
+                            "-i", video_path, "-ss", "0", "-vframes", "1",
+                            "-vf", "scale=320:-1", "-q:v", "5", thumb_path
+                        ],
+                        "timeout": base_timeout * 2
+                    })
+    
+    strategies.append({
+        "name": "no_filter",
+        "cmd": [
+            "ffmpeg", "-y", "-i", video_path,
+            "-vframes", "1", "-q:v", "5", thumb_path
+        ],
+        "timeout": base_timeout * 1.5
+    })
     
     for strategy in strategies:
         proc = None
@@ -223,10 +287,10 @@ async def generate_thumbnail(video_path, thumb_path=None, duration=None):
             else:
                 stderr_str = stderr.decode().strip() if stderr else ""
                 if stderr_str and len(stderr_str) > 0:
-                    LOGGER(__name__).debug(f"Strategy '{strategy['name']}' failed: {stderr_str[:100]}")
+                    LOGGER(__name__).debug(f"Strategy '{strategy['name']}' failed: {stderr_str[:50]}")
                     
         except Exception as e:
-            LOGGER(__name__).debug(f"Strategy '{strategy['name']}' error: {type(e).__name__}: {str(e)[:100]}")
+            LOGGER(__name__).debug(f"Strategy '{strategy['name']}' error: {type(e).__name__}")
             if proc:
                 try:
                     if proc.returncode is None:
@@ -244,7 +308,13 @@ async def generate_thumbnail(video_path, thumb_path=None, duration=None):
                 finally:
                     proc = None
     
-    LOGGER(__name__).warning(f"Thumbnail generation failed: {os.path.basename(video_path)}")
+    LOGGER(__name__).debug(f"All strategies failed, creating placeholder")
+    placeholder = await create_placeholder_thumbnail(thumb_path)
+    if placeholder:
+        LOGGER(__name__).debug(f"Using placeholder thumbnail for {os.path.basename(video_path)}")
+        return placeholder
+    
+    LOGGER(__name__).warning(f"Thumbnail generation completely failed: {os.path.basename(video_path)}")
     try:
         if os.path.exists(thumb_path):
             os.remove(thumb_path)
@@ -492,13 +562,8 @@ async def safe_progress_callback(current, total, *args):
         # Visual format with progress bar
         progress_text = f"**{action}** `{pct}%`\n{progress_bar}\n{get_readable_file_size(current)}/{get_readable_file_size(total)} • {get_readable_file_size(current_speed)}/s • {get_readable_time(int(eta))}"
         
-        # Update message without blocking download (fire and forget)
-        # Using create_task instead of await prevents blocking the download stream
-        try:
-            asyncio.create_task(progress_message.edit(progress_text))
-        except RuntimeError:
-            # If no event loop is running, do synchronous edit
-            await progress_message.edit(progress_text)
+        # Try to update message
+        await progress_message.edit(progress_text)
         # Mark successful update with current bytes for next speed calculation
         _progress_throttle.mark_updated(message_id, percentage, now, current)
             
