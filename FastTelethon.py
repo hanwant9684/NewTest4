@@ -100,9 +100,9 @@ class UploadSender:
         self.loop = loop
 
     async def next(self, data: bytes) -> None:
-        if self.previous:
-            await self.previous
-        self.previous = self.loop.create_task(self._next(data))
+        # FIXED: Removed sequential chaining that blocked concurrent uploads
+        # Now all uploaders send data concurrently without waiting for previous uploads
+        self.loop.create_task(self._next(data))
 
     async def _next(self, data: bytes) -> None:
         self.request.bytes = data
@@ -112,8 +112,8 @@ class UploadSender:
         self.request.file_part += self.stride
 
     async def disconnect(self) -> None:
-        if self.previous:
-            await self.previous
+        # Give pending uploads a moment to queue
+        await asyncio.sleep(0.1)
         return await self.sender.disconnect()
 
 
@@ -301,8 +301,10 @@ class ParallelTransferrer:
                 tasks = []
                 for sender in self.senders:
                     tasks.append(self.loop.create_task(sender.next()))
-                for task in tasks:
-                    data = await task
+                # FIXED: Use as_completed() instead of sequential await
+                # This ensures faster connections deliver data immediately without waiting for slow ones
+                for future in asyncio.as_completed(tasks):
+                    data = await future
                     if not data:
                         break
                     yield data
