@@ -287,12 +287,12 @@ class ParallelTransferrer:
                        part_size_kb: Optional[float] = None,
                        connection_count: Optional[int] = None) -> AsyncGenerator[bytes, None]:
         connection_count = connection_count or self._get_connection_count(file_size)
-        # OPTIMIZED: Always use maximum part size (512KB) for fastest downloads
-        # Larger chunks = fewer requests = higher throughput
-        part_size = (part_size_kb or 512) * 1024  # 512KB max chunk size
+        # OPTIMIZED: Use 1MB chunks for stable, consistent download speeds
+        # Larger chunks reduce overhead and prevent speed fluctuation
+        part_size = (part_size_kb or 1024) * 1024  # 1MB chunks for stability
         part_count = math.ceil(file_size / part_size)
         log.debug("Starting parallel download: "
-                  f"{connection_count} {part_size} {part_count} {file!s}")
+                  f"{connection_count} connections, {part_size} chunk size, {part_count} chunks")
         await self._init_download(connection_count, file, part_count, part_size)
 
         try:
@@ -301,13 +301,18 @@ class ParallelTransferrer:
                 tasks = []
                 for sender in self.senders:
                     tasks.append(self.loop.create_task(sender.next()))
-                for task in tasks:
-                    data = await task
-                    if not data:
+                
+                # Use gather to download all parts in parallel without blocking
+                results = await asyncio.gather(*tasks, return_exceptions=True)
+                
+                for data in results:
+                    if isinstance(data, Exception) or not data:
                         break
                     yield data
                     part += 1
-                    log.debug(f"Part {part} downloaded")
+                    # Reduce debug logging frequency to not block download
+                    if part % 10 == 0:
+                        log.debug(f"Downloaded {part}/{part_count} chunks")
         finally:
             log.debug("Parallel download finished, cleaning up connections")
             await self._cleanup()
@@ -381,10 +386,16 @@ async def download_file(client: TelegramClient,
     # We lock the transfers because telegram has connection count limits
     downloader = ParallelTransferrer(client, dc_id)
     downloaded = downloader.download(location, size, connection_count=connection_count)
+    
+    # OPTIMIZED: Cache downloaded bytes instead of calling expensive out.tell()
+    # Prevents disk I/O bottleneck that causes speed cycling
+    downloaded_bytes = 0
     async for x in downloaded:
         out.write(x)
+        downloaded_bytes += len(x)
         if progress_callback:
-            r = progress_callback(out.tell(), size)
+            # Pass cached byte count instead of out.tell() (no disk I/O)
+            r = progress_callback(downloaded_bytes, size)
             if inspect.isawaitable(r):
                 await r
 
