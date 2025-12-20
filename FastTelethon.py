@@ -59,21 +59,13 @@ class DownloadSender:
                 return result.bytes
             except Exception as e:
                 error_str = str(e).lower()
-              # In FastTelethon.py, line 62-68, replace with:
-except Exception as e:
-    error_str = str(e).lower()
-    if 'flood' in error_str or '420' in str(type(e).__name__):
-        import re
-        wait_match = re.search(r'(\d+)', str(e))
-        wait_time = int(wait_match.group(1)) if wait_match else 5
-        wait_time = min(wait_time, 60)  # Increased from 30s to 60s max
-        
-        # Exponential backoff:  increase wait on retries
-        if attempt > 0:
-            wait_time *= (2 ** (attempt - 1))  # 5s → 10s → 20s
-        
-        log.warning(f"FLOOD_WAIT detected, waiting {wait_time}s (attempt {attempt+1}/{max_retries})")
-        await asyncio.sleep(wait_time)
+                if 'flood' in error_str or '420' in str(type(e).__name__):
+                    import re
+                    wait_match = re.search(r'(\d+)', str(e))
+                    wait_time = int(wait_match.group(1)) if wait_match else 5
+                    wait_time = min(wait_time, 30)
+                    log.warning(f"FLOOD_WAIT detected, waiting {wait_time}s (attempt {attempt+1}/{max_retries})")
+                    await asyncio.sleep(wait_time)
                     if attempt == max_retries - 1:
                         raise
                 else:
@@ -278,7 +270,7 @@ class ParallelTransferrer:
                           connection_count: Optional[int] = None) -> Tuple[int, int, bool]:
         connection_count = connection_count or self._get_connection_count(file_size)
         # OPTIMIZED: Always use maximum part size (512KB) for fastest uploads
-        part_size = (part_size_kb or 1024) * 1024  # 512KB max chunk size
+        part_size = (part_size_kb or 512) * 1024  # 512KB max chunk size
         part_count = (file_size + part_size - 1) // part_size
         is_large = file_size > 10 * 1024 * 1024
         await self._init_upload(connection_count, file_id, part_count, is_large)
@@ -297,7 +289,7 @@ class ParallelTransferrer:
         connection_count = connection_count or self._get_connection_count(file_size)
         # OPTIMIZED: Always use maximum part size (512KB) for fastest downloads
         # Larger chunks = fewer requests = higher throughput
-        part_size = (part_size_kb or 1024) * 1024  # 512KB max chunk size
+        part_size = (part_size_kb or 512) * 1024  # 512KB max chunk size
         part_count = math.ceil(file_size / part_size)
         log.debug("Starting parallel download: "
                   f"{connection_count} {part_size} {part_count} {file!s}")
