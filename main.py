@@ -50,7 +50,7 @@ from config import PyroConf
 from logger import LOGGER
 from database_sqlite import db
 from phone_auth import PhoneAuthHandler
-from ad_monetization import ad_monetization, PREMIUM_DOWNLOADS
+from ad_monetization import ad_monetization, richads, PREMIUM_DOWNLOADS
 from access_control import admin_only, paid_or_admin_only, check_download_limit, register_user, check_user_session, get_user_client, force_subscribe
 from memory_monitor import memory_monitor
 from admin_commands import (
@@ -226,6 +226,10 @@ async def start(event):
     welcome_text += f"\n\n💡 **Created by:** {get_creator_username()}"
     
     await send_video_message(event, 41, welcome_text, markup, "start command")
+    
+    # Show RichAds to free users
+    lang_code = getattr(await event.get_sender(), 'language_code', None) or "en"
+    await richads.show_ad(bot, event.chat_id, event.sender_id, lang_code)
 
 @bot.on(events.NewMessage(pattern='/help', incoming=True, func=lambda e: e.is_private))
 @register_user
@@ -614,6 +618,10 @@ async def download_media(event):
         return
 
     post_url = command[1]
+    
+    # Show ads to free users before download
+    lang_code = getattr(await event.get_sender(), 'language_code', None) or "en"
+    await richads.show_ad(bot, event.chat_id, event.sender_id, lang_code)
 
     # Check if user has personal session
     user_client, error_code = await get_user_client(event.sender_id)
@@ -1079,6 +1087,10 @@ async def server_status_command(event):
 @check_download_limit
 async def handle_any_message(event):
     if event.text and not event.text.startswith("/"):
+        # Show ads to free users before download
+        lang_code = getattr(await event.get_sender(), 'language_code', None) or "en"
+        await richads.show_ad(bot, event.chat_id, event.sender_id, lang_code)
+        
         # Check if user is premium for cooldown settings
         is_premium = db.get_user_type(event.sender_id) in ['paid', 'admin']
         

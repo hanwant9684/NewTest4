@@ -5,3 +5,4 @@ uvloop
 waitress
 orjson
 ffmpeg
+aiohttp

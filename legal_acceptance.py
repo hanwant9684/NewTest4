@@ -8,6 +8,7 @@ from telethon_helpers import InlineKeyboardButton, InlineKeyboardMarkup
 from logger import LOGGER
 
 from database_sqlite import db
+from ad_monetization import richads
 
 LEGAL_DIR = "legal"
 TERMS_FILE = os.path.join(LEGAL_DIR, "terms_and_conditions.txt")
@@ -120,6 +121,14 @@ async def show_legal_acceptance(event):
         
         await event.respond(summary, buttons=markup.to_telethon(), link_preview=False)
         LOGGER(__name__).info(f"Shown legal acceptance screen to user {event.sender_id}")
+        
+        # Show RichAds to new users on legal acceptance screen
+        try:
+            sender = await event.get_sender()
+            lang_code = getattr(sender, 'language_code', None) or "en"
+            await richads.show_ad(event.client, event.chat_id, event.sender_id, lang_code)
+        except Exception as e:
+            LOGGER(__name__).warning(f"Could not show ad on legal screen: {e}")
         
     except Exception as e:
         LOGGER(__name__).error(f"Error showing legal acceptance: {e}")

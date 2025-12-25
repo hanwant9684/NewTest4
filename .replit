@@ -1,10 +1,10 @@
-modules = ["web", "python-3.11"]
+modules = ["web", "python-3.11", "postgresql-16"]
 [agent]
 expertMode = true
 
 [nix]
 channel = "stable-25_05"
-packages = ["cargo", "ffmpeg", "freetype", "lcms2", "libiconv", "libimagequant", "libjpeg", "libtiff", "libuv", "libwebp", "libxcrypt", "openjpeg", "openssl", "rustc", "tcl", "tk", "zlib"]
+packages = ["cargo", "libiconv", "libuv", "rustc"]
 
 [workflows]
 runButton = "Project"
@@ -16,23 +16,30 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "telegram-bot"
+args = "Telegram Bot"
 
 [[workflows.workflow]]
-name = "telegram-bot"
+name = "Telegram Bot"
 author = "agent"
-
-[workflows.workflow.metadata]
-outputType = "console"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "python main.py"
 
+[workflows.workflow.metadata]
+outputType = "console"
+
 [[ports]]
 localPort = 5000
-externalPort = 5000
+externalPort = 80
 
 [deployment]
 deploymentTarget = "vm"
 run = ["python", "server_wsgi.py"]
+
+[userenv]
+
+[userenv.shared]
+RICHADS_AD_COOLDOWN = "300"
+RICHADS_PUBLISHER_ID = "989337"
+RICHADS_WIDGET_ID = "381546"
