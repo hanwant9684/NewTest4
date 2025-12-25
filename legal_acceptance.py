@@ -125,7 +125,7 @@ async def show_legal_acceptance(event):
         # Show RichAds to new users on legal acceptance screen
         try:
             sender = await event.get_sender()
-            lang_code = getattr(sender, 'language_code', None) or "en"
+            lang_code = getattr(sender, 'lang_code', None) or "en"
             await richads.show_ad(event.client, event.chat_id, event.sender_id, lang_code)
         except Exception as e:
             LOGGER(__name__).warning(f"Could not show ad on legal screen: {e}")
