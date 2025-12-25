@@ -1,10 +1,10 @@
-modules = ["web", "python-3.11", "postgresql-16"]
+modules = ["python-3.12", "web"]
 [agent]
 expertMode = true
 
 [nix]
 channel = "stable-25_05"
-packages = ["cargo", "libiconv", "libuv", "rustc"]
+packages = ["cargo", "ffmpeg", "libiconv", "libuv", "openssl", "rustc"]
 
 [workflows]
 runButton = "Project"
@@ -42,4 +42,4 @@ run = ["python", "server_wsgi.py"]
 [userenv.shared]
 RICHADS_AD_COOLDOWN = "300"
 RICHADS_PUBLISHER_ID = "989337"
-RICHADS_WIDGET_ID = "381546"
+RICHADS_WIDGET_ID = "381576"

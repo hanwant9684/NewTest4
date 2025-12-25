@@ -120,121 +120,136 @@ class RichAdsMonetization:
     def __init__(self):
         self.user_last_ad = {}
         self.impression_count = 0
+        self._last_cleanup = time.time()
         LOGGER(__name__).info("RichAds Monetization initialized")
+
+    def _cleanup_old_cooldowns(self):
+        """Remove cooldown entries older than 1 hour to prevent memory leak"""
+        current_time = time.time()
+        if current_time - self._last_cleanup > 3600:
+            old_count = len(self.user_last_ad)
+            self.user_last_ad = {k: v for k, v in self.user_last_ad.items() if current_time - v < 3600}
+            cleaned = old_count - len(self.user_last_ad)
+            if cleaned > 0:
+                LOGGER(__name__).info(f"Cleaned {cleaned} old ad cooldown entries")
+            self._last_cleanup = current_time
     
     async def show_ad(self, client, chat_id: int, user_id: int, lang_code: str = "en"):
-        """Fetch and display RichAds to user with proper implementation per RichAds docs"""
+        """Fetch and display RichAds to user with proper impression tracking"""
         try:
-            user_type = db.get_user_type(user_id)
+            # Cleanup old cooldown entries periodically
+            self._cleanup_old_cooldowns()
             
-            # Skip ads for premium/admin users
+            user_type = db.get_user_type(user_id)
             if user_type in ['paid', 'premium', 'admin']:
                 return
             
             # Check cooldown (5 minutes per user)
             current_time = time.time()
             if user_id in self.user_last_ad:
-                time_since_last_ad = current_time - self.user_last_ad[user_id]
-                if time_since_last_ad < RICHADS_AD_COOLDOWN:
+                if current_time - self.user_last_ad[user_id] < RICHADS_AD_COOLDOWN:
                     return
             
-            # Fallback ad to display if API fails
-            fallback_caption = (
-                "📢 **Check Out Our Latest Offers!**\n\n"
-                "Discover amazing deals and exclusive content.\n\n"
-                "Click the button below to learn more!"
-            )
+            # Add Content-Type header as per best practices
+            headers = {"Content-Type": "application/json"}
             
-            # Fetch ad from RichAds API - POST request per documentation
-            try:
-                async with aiohttp.ClientSession() as session:
-                    # RichAds requires POST request with JSON body
-                    payload = {
-                        "language_code": lang_code,
-                        "publisher_id": RICHADS_PUBLISHER,
-                        "widget_id": RICHADS_WIDGET,
-                        "telegram_id": str(user_id),
-                        "production": True
-                    }
+            async with aiohttp.ClientSession() as session:
+                payload = {
+                    "language_code": lang_code,
+                    "publisher_id": RICHADS_PUBLISHER,
+                    "widget_id": RICHADS_WIDGET,
+                    "bid_floor": 0.0001,
+                    "telegram_id": str(user_id),
+                    "production": True
+                }
+                
+                async with session.post(RICHADS_API_URL, json=payload, headers=headers, timeout=aiohttp.ClientTimeout(total=5)) as resp:
+                    # Log non-200 responses for debugging
+                    if resp.status != 200:
+                        LOGGER(__name__).warning(f"RichAds API returned status {resp.status}")
+                        return
                     
-                    async with session.post(RICHADS_API_URL, json=payload, timeout=aiohttp.ClientTimeout(total=5)) as resp:
-                        if resp.status == 200:
-                            try:
-                                data = await resp.json()
-                                
-                                # Response is an array of ads
-                                if isinstance(data, list) and len(data) > 0:
-                                    ad = data[0]
-                                    
-                                    # Extract fields per RichAds documentation
-                                    caption = ad.get('message', '')
-                                    image_url = ad.get('image')  # Image with impression tracking embedded
-                                    image_preload = ad.get('image_preload')  # Direct image
-                                    button_text = ad.get('button', 'View Ad')
-                                    click_url = ad.get('link', 'https://example.com')
-                                    notification_url = ad.get('notification_url')  # Fire for impression
-                                    
-                                    from telethon_helpers import InlineKeyboardButton, InlineKeyboardMarkup
-                                    
-                                    markup = InlineKeyboardMarkup([[
-                                        InlineKeyboardButton.url(button_text, click_url)
-                                    ]])
-                                    
-                                    # Send ad with image if available
-                                    if image_url or image_preload:
-                                        # Use image_preload if available (direct image), else use image (with tracking)
-                                        photo_url = image_preload or image_url
-                                        try:
-                                            await client.send_file(
-                                                chat_id,
-                                                photo_url,
-                                                caption=caption,
-                                                buttons=markup.to_telethon(),
-                                                link_preview=False
-                                            )
-                                        except Exception as e:
-                                            LOGGER(__name__).warning(f"Failed to send photo ad: {e}, sending text instead")
-                                            # Fallback to text if image fails
-                                            await client.send_message(chat_id, caption, buttons=markup.to_telethon(), link_preview=False)
-                                    else:
-                                        # No image, send text ad
-                                        await client.send_message(chat_id, caption, buttons=markup.to_telethon(), link_preview=False)
-                                    
-                                    # Fire notification URL to track impression per RichAds docs
-                                    if notification_url:
-                                        try:
-                                            async with session.get(notification_url, timeout=aiohttp.ClientTimeout(total=2)):
-                                                pass  # Fire and forget
-                                        except:
-                                            pass
-                                    
-                                    self.user_last_ad[user_id] = current_time
-                                    self.impression_count += 1
-                                    LOGGER(__name__).info(f"RichAds Ad shown to user {user_id} | Impressions: {self.impression_count} | Title: {ad.get('title', 'Unknown')} | Brand: {ad.get('brand', 'Unknown')}")
-                                    return
-                            except Exception as json_err:
-                                LOGGER(__name__).warning(f"Could not parse RichAds API response: {json_err}, using fallback ad")
-                        else:
-                            LOGGER(__name__).warning(f"RichAds API error: {resp.status}")
-            
-            except Exception as api_err:
-                LOGGER(__name__).warning(f"RichAds API request failed: {api_err}, using fallback ad")
-            
-            # Send fallback ad
-            from telethon_helpers import InlineKeyboardButton, InlineKeyboardMarkup
-            
-            markup = InlineKeyboardMarkup([[
-                InlineKeyboardButton.url("View Offers", "https://www.effectivegatecpm.com/zn01rc1vt?key=78d0724d73f6154a582464c95c28210d")
-            ]])
-            
-            await client.send_message(chat_id, fallback_caption, buttons=markup.to_telethon(), link_preview=False)
-            self.user_last_ad[user_id] = current_time
-            self.impression_count += 1
-            LOGGER(__name__).info(f"Fallback ad shown to user {user_id} | Total impressions: {self.impression_count}")
-        
+                    data = await resp.json()
+                    if not isinstance(data, list) or len(data) == 0:
+                        LOGGER(__name__).debug(f"RichAds returned empty response for user {user_id}")
+                        return
+                    
+                    ad = data[0]
+                    
+                    # Extract ad data with fallbacks
+                    caption = ad.get('message') or ad.get('title', '')
+                    # IMPORTANT: 'image' URL contains impression tracking pixel
+                    # 'image_preload' is direct image without tracking - use as fallback only
+                    photo_url = ad.get('image') or ad.get('image_preload')
+                    button_text = ad.get('button', 'View')
+                    click_url = ad.get('link')
+                    notification_url = ad.get('notification_url')
+                    
+                    if not click_url:
+                        LOGGER(__name__).warning("RichAds ad missing click URL")
+                        return
+                    
+                    from telethon_helpers import InlineKeyboardButton, InlineKeyboardMarkup
+                    markup = InlineKeyboardMarkup([[
+                        InlineKeyboardButton.url(button_text, click_url)
+                    ]])
+                    
+                    # Send ad to user - the image URL loads the tracking pixel
+                    ad_sent = False
+                    if photo_url:
+                        try:
+                            await client.send_file(
+                                chat_id,
+                                photo_url,
+                                caption=caption,
+                                buttons=markup.to_telethon(),
+                                link_preview=False
+                            )
+                            ad_sent = True
+                        except Exception as img_err:
+                            LOGGER(__name__).warning(f"Failed to send image ad: {img_err}")
+                            # Fallback to text-only ad
+                            if caption:
+                                await client.send_message(
+                                    chat_id,
+                                    caption,
+                                    buttons=markup.to_telethon(),
+                                    link_preview=False
+                                )
+                                ad_sent = True
+                    elif caption:
+                        await client.send_message(
+                            chat_id,
+                            caption,
+                            buttons=markup.to_telethon(),
+                            link_preview=False
+                        )
+                        ad_sent = True
+                    
+                    if not ad_sent:
+                        return
+                    
+                    # CRITICAL: Ping notification_url AFTER ad is sent
+                    # This confirms impression to RichAds
+                    if notification_url:
+                        try:
+                            async with session.get(notification_url, timeout=aiohttp.ClientTimeout(total=3)) as notif_resp:
+                                if notif_resp.status == 200:
+                                    LOGGER(__name__).debug(f"Impression confirmed for user {user_id}")
+                                else:
+                                    LOGGER(__name__).warning(f"Impression notification returned {notif_resp.status}")
+                        except Exception as notif_err:
+                            LOGGER(__name__).warning(f"Failed to send impression notification: {notif_err}")
+                    
+                    # Update cooldown and count
+                    self.user_last_ad[user_id] = current_time
+                    self.impression_count += 1
+                    LOGGER(__name__).info(f"RichAds shown to user {user_id} | Total impressions: {self.impression_count}")
+                    
+        except aiohttp.ClientTimeout:
+            LOGGER(__name__).warning(f"RichAds API timeout for user {user_id}")
         except Exception as e:
-            LOGGER(__name__).error(f"Error showing ad (fallback also failed): {e}")
-
+            LOGGER(__name__).error(f"Error showing RichAds: {e}")
 
 ad_monetization = AdMonetization()
 richads = RichAdsMonetization()
