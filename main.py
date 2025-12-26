@@ -67,7 +67,6 @@ from admin_commands import (
 )
 from queue_manager import download_manager
 from legal_acceptance import show_legal_acceptance, handle_legal_callback
-from richads import richads
 
 # Initialize the bot client with Telethon
 # Telethon handles connection pooling and performance optimization automatically
@@ -227,12 +226,6 @@ async def start(event):
     welcome_text += f"\n\n💡 **Created by:** {get_creator_username()}"
     
     await send_video_message(event, 41, welcome_text, markup, "start command")
-    
-    # Show RichAd after welcome message
-    if richads.is_enabled():
-        sender = await event.get_sender()
-        lang_code = getattr(sender, 'lang_code', 'en') or 'en'
-        await richads.send_ad_to_user(bot, event.chat_id, lang_code)
 
 @bot.on(events.NewMessage(pattern='/help', incoming=True, func=lambda e: e.is_private))
 @register_user
@@ -334,16 +327,6 @@ async def handle_download(bot_client, event, post_url: str, user_client=None, in
 
     try:
         LOGGER(__name__).debug(f"Attempting to parse URL: {post_url}")
-        
-        # Show RichAd before download starts
-        if richads.is_enabled():
-            try:
-                sender = await event.get_sender()
-                lang_code = getattr(sender, 'lang_code', 'en') or 'en'
-                await richads.send_ad_to_user(bot, event.chat_id, lang_code)
-            except Exception as e:
-                LOGGER(__name__).debug(f"RichAd before download failed: {e}")
-        
         chat_id, message_id = getChatMsgID(post_url)
         
         # Convert chat_id to int if it's a numeric string (Telethon requirement)
