@@ -7,3 +7,11 @@ orjson
 ffmpeg
 flask
 aiohttp
+aiohttp
+cryptg
+flask
+orjson
+psutil
+Telethon
+uvloop
+waitress

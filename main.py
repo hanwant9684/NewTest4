@@ -163,7 +163,7 @@ async def start(event):
     
     if not db.check_legal_acceptance(event.sender_id):
         LOGGER(__name__).info(f"User {event.sender_id} needs to accept legal terms")
-        await show_legal_acceptance(event)
+        await show_legal_acceptance(event, bot)
         return
     
     # Check if this is a verification deep link (format: /start verify_CODE)
