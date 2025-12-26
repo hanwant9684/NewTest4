@@ -36,3 +36,10 @@ externalPort = 5000
 [deployment]
 deploymentTarget = "vm"
 run = ["python", "server_wsgi.py"]
+
+[userenv]
+
+[userenv.shared]
+RICHADS_PUBLISHER_ID = "989337"
+RICHADS_WIDGET_ID = "381546"
+RICHADS_PRODUCTION = "true"

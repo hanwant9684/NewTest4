@@ -41,6 +41,12 @@ class PyroConf:
     # Ad Monetization - Droplink.co
     # API key is stored in .env file (DROPLINK_API_KEY)
     
+    # RichAds Configuration
+    RICHADS_PUBLISHER_ID = os.getenv("RICHADS_PUBLISHER_ID", "")
+    RICHADS_WIDGET_ID = os.getenv("RICHADS_WIDGET_ID", "")
+    RICHADS_PRODUCTION = os.getenv("RICHADS_PRODUCTION", "true").lower() == "true"
+    RICHADS_AD_COOLDOWN = 300  # 5 minutes cooldown between ad displays
+    
     # Cloud Backup Configuration (GitHub)
     CLOUD_BACKUP_SERVICE = os.getenv("CLOUD_BACKUP_SERVICE", "").lower().strip()
     GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "")
