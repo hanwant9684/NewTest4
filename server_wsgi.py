@@ -356,8 +356,8 @@ def application(environ, start_response):
         
         elif path == '/reward' and method == 'GET':
             """Handle AdsGram reward - grant 5 free downloads to user"""
-            from database_sqlite import db
             import json
+            from database_sqlite import db
             
             query_string = environ.get('QUERY_STRING', '')
             params = parse_qs(query_string)
@@ -365,6 +365,7 @@ def application(environ, start_response):
             
             try:
                 if not user_id_str or not user_id_str.isdigit():
+                    _logger.warning(f"Invalid user_id in reward request: '{user_id_str}'")
                     status = '400 Bad Request'
                     body = json.dumps({"status": "error", "message": "Invalid user_id"}).encode('utf-8')
                     headers = [('Content-Type', 'application/json; charset=utf-8')] + headers_common
@@ -372,14 +373,13 @@ def application(environ, start_response):
                     return [body]
                 
                 user_id = int(user_id_str)
-                LOGGER(__name__).info(f"AdsGram reward request for user {user_id}")
+                _logger.info(f"AdsGram reward request for user {user_id}")
                 
                 # Ensure user exists in database before adding downloads
                 user = db.get_user(user_id)
                 if not user:
-                    LOGGER(__name__).warning(f"User {user_id} not found in database, attempting to create user record")
+                    _logger.warning(f"User {user_id} not found in database, creating user record")
                     # Create user record if doesn't exist
-                    from datetime import datetime
                     db.add_user(user_id, username='', first_name='')
                 
                 # Grant 5 free downloads for watching ad
@@ -388,7 +388,7 @@ def application(environ, start_response):
                 if success:
                     user_data = db.get_user(user_id)
                     ad_downloads = user_data.get('ad_downloads', 5) if user_data else 5
-                    LOGGER(__name__).info(f"✅ Granted 5 free downloads to user {user_id} from AdsGram reward | Total ad_downloads: {ad_downloads}")
+                    _logger.info(f"✅ AdsGram reward SUCCESS | User: {user_id} | Total ad_downloads: {ad_downloads}")
                     status = '200 OK'
                     body = json.dumps({
                         "status": "success",
@@ -397,7 +397,7 @@ def application(environ, start_response):
                         "downloads_granted": 5
                     }).encode('utf-8')
                 else:
-                    LOGGER(__name__).warning(f"❌ Failed to grant downloads to user {user_id}")
+                    _logger.error(f"❌ Failed to add downloads for user {user_id}")
                     status = '400 Bad Request'
                     body = json.dumps({
                         "status": "error",
@@ -409,7 +409,7 @@ def application(environ, start_response):
                 return [body]
                 
             except Exception as e:
-                LOGGER(__name__).error(f"Error processing AdsGram reward: {e}")
+                _logger.error(f"Error processing AdsGram reward: {str(e)}")
                 status = '500 Internal Server Error'
                 body = json.dumps({"status": "error", "message": "Server error"}).encode('utf-8')
                 headers = [('Content-Type', 'application/json; charset=utf-8')] + headers_common
