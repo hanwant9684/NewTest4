@@ -104,7 +104,7 @@ def get_full_privacy() -> str:
     return f"🔒 **PRIVACY POLICY (FULL)**\n\n{privacy}"
 
 async def show_legal_acceptance(event, bot=None):
-    """Show legal acceptance screen to user and optionally show AdsGram ad below"""
+    """Show legal acceptance screen to user and optionally show AdsGram ad below (free users only)"""
     try:
         summary = get_legal_summary()
         
@@ -122,8 +122,13 @@ async def show_legal_acceptance(event, bot=None):
         await event.respond(summary, buttons=markup.to_telethon(), link_preview=False)
         LOGGER(__name__).info(f"Shown legal acceptance screen to user {event.sender_id}")
         
-        # Show AdsGram ad below legal acceptance if bot client is provided
-        if bot and adsgram.is_enabled():
+        # Show AdsGram ad below legal acceptance if bot client is provided (free users only)
+        user_type = db.get_user_type(event.sender_id)
+        is_admin = db.is_admin(event.sender_id)
+        is_premium = user_type == 'paid'
+        
+        # Skip ads for premium and admin users
+        if not (is_premium or is_admin) and bot and adsgram.is_enabled():
             try:
                 sender = await event.get_sender()
                 lang_code = getattr(sender, 'lang_code', 'en') or 'en'

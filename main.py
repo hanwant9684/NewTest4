@@ -231,9 +231,13 @@ async def start(event):
     await send_video_message(event, 41, welcome_text, markup, "start command")
     
     # Show ad after welcome message (RichAds first, fallback to AdsGram)
+    # Skip ads for premium and admin users
     sender = await event.get_sender()
     lang_code = getattr(sender, 'lang_code', 'en') or 'en'
-    await ad_manager.send_ad_with_fallback(bot, event.sender_id, event.chat_id, lang_code)
+    user_type = db.get_user_type(event.sender_id)
+    is_premium = user_type == 'paid'
+    is_admin = db.is_admin(event.sender_id)
+    await ad_manager.send_ad_with_fallback(bot, event.sender_id, event.chat_id, lang_code, is_premium=is_premium, is_admin=is_admin)
 
 @bot.on(events.NewMessage(pattern='/help', incoming=True, func=lambda e: e.is_private))
 @register_user

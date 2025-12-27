@@ -374,11 +374,21 @@ def application(environ, start_response):
                 user_id = int(user_id_str)
                 LOGGER(__name__).info(f"AdsGram reward request for user {user_id}")
                 
+                # Ensure user exists in database before adding downloads
+                user = db.get_user(user_id)
+                if not user:
+                    LOGGER(__name__).warning(f"User {user_id} not found in database, attempting to create user record")
+                    # Create user record if doesn't exist
+                    from datetime import datetime
+                    db.add_user(user_id, username='', first_name='')
+                
                 # Grant 5 free downloads for watching ad
                 success = db.add_ad_downloads(user_id, 5)
                 
                 if success:
-                    LOGGER(__name__).info(f"✅ Granted 5 free downloads to user {user_id} from AdsGram reward")
+                    user_data = db.get_user(user_id)
+                    ad_downloads = user_data.get('ad_downloads', 5) if user_data else 5
+                    LOGGER(__name__).info(f"✅ Granted 5 free downloads to user {user_id} from AdsGram reward | Total ad_downloads: {ad_downloads}")
                     status = '200 OK'
                     body = json.dumps({
                         "status": "success",
