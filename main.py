@@ -68,8 +68,6 @@ from admin_commands import (
 from queue_manager import download_manager
 from legal_acceptance import show_legal_acceptance, handle_legal_callback
 from richads import richads
-from adsgram import adsgram
-from ad_manager import ad_manager
 
 # Initialize the bot client with Telethon
 # Telethon handles connection pooling and performance optimization automatically
@@ -186,7 +184,7 @@ async def start(event):
         else:
             await event.respond(
                 f"❌ **Verification Failed**\n\n{msg}\n\n"
-                "Please try again with `/getpremium` to get a new link"
+                "Please try getting a new code with `/getpremium`"
             )
             LOGGER(__name__).warning(f"❌ AUTO-VERIFICATION FAILED | User: {event.sender_id} ({username}) | Reason: {msg}")
         return
@@ -203,9 +201,9 @@ async def start(event):
         "   📥 Just paste any Telegram link\n\n"
         "━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
         "💎 **Get Free Downloads:**\n\n"
-        "🎁 **Option 1: FREE (Watch Ads & Visit Website)**\n"
-        "   📥 5 free downloads per session\n"
-        "   📺 Visit website pages 1-5 (2.5 minutes)\n"
+        "🎁 **Option 1: FREE (Watch Ads)**\n"
+        "   📥 5 free download per ad session\n"
+        "   📺 Complete quick verification steps\n"
         "   ♻️ Repeat anytime!\n"
         "   👉 Use: `/getpremium`\n\n"
         "💰 **Option 2: Paid ($2/month)**\n"
@@ -230,14 +228,11 @@ async def start(event):
     
     await send_video_message(event, 41, welcome_text, markup, "start command")
     
-    # Show ad after welcome message (RichAds first, fallback to AdsGram)
-    # Skip ads for premium and admin users
-    sender = await event.get_sender()
-    lang_code = getattr(sender, 'lang_code', 'en') or 'en'
-    user_type = db.get_user_type(event.sender_id)
-    is_premium = user_type == 'paid'
-    is_admin = db.is_admin(event.sender_id)
-    await ad_manager.send_ad_with_fallback(bot, event.sender_id, event.chat_id, lang_code, is_premium=is_premium, is_admin=is_admin)
+    # Show RichAd after welcome message
+    if richads.is_enabled():
+        sender = await event.get_sender()
+        lang_code = getattr(sender, 'lang_code', 'en') or 'en'
+        await richads.send_ad_to_user(bot, event.chat_id, lang_code)
 
 @bot.on(events.NewMessage(pattern='/help', incoming=True, func=lambda e: e.is_private))
 @register_user
@@ -340,14 +335,14 @@ async def handle_download(bot_client, event, post_url: str, user_client=None, in
     try:
         LOGGER(__name__).debug(f"Attempting to parse URL: {post_url}")
         
-        # Show ad before download starts (RichAds first, fallback to AdsGram)
-        if ad_manager.is_any_enabled():
+        # Show RichAd before download starts
+        if richads.is_enabled():
             try:
                 sender = await event.get_sender()
                 lang_code = getattr(sender, 'lang_code', 'en') or 'en'
-                await ad_manager.send_ad_with_fallback(bot, event.sender_id, event.chat_id, lang_code)
+                await richads.send_ad_to_user(bot, event.chat_id, lang_code)
             except Exception as e:
-                LOGGER(__name__).debug(f"Ad display failed before download: {e}")
+                LOGGER(__name__).debug(f"RichAd before download failed: {e}")
         
         chat_id, message_id = getChatMsgID(post_url)
         
@@ -1284,7 +1279,7 @@ async def admin_stats_handler(event):
 @bot.on(events.NewMessage(pattern='/getpremium', incoming=True, func=lambda e: e.is_private))
 @register_user
 async def get_premium_command(event):
-    """Generate ad link for temporary premium access - visit website pages 1-5"""
+    """Generate ad link for temporary premium access"""
     LOGGER(__name__).info(f"get_premium_command triggered by user {event.sender_id}")
     try:
         user_type = db.get_user_type(event.sender_id)
@@ -1331,11 +1326,11 @@ async def get_premium_command(event):
             f"🎬 **Get {PREMIUM_DOWNLOADS} FREE downloads!**\n\n"
             "**How it works:**\n"
             "1️⃣ Click the button below\n"
-            "2️⃣ Visit pages 1-5 on our website (2.5 minutes total)\n"
+            "2️⃣ Navigate through pages 1-5 on our blog (2.5 minutes total)\n"
             "3️⃣ A timer will show your progress at the top\n"
             "4️⃣ After completing all pages, get your verification code\n"
             "5️⃣ Send: `/verifypremium <code>`\n\n"
-            "⚠️ **Note:** You must visit all 5 pages within the time limit!\n\n"
+            "⚠️ **Note:** You must visit 5 different pages within the time limit!\n\n"
             "⏱️ Session expires in 30 minutes"
         )
         

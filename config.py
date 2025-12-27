@@ -47,10 +47,6 @@ class PyroConf:
     RICHADS_PRODUCTION = os.getenv("RICHADS_PRODUCTION", "true").lower() == "true"
     RICHADS_AD_COOLDOWN = 300  # 5 minutes cooldown between ad displays
     
-    # AdsGram Configuration (Fallback ad network)
-    # Block ID from AdsGram dashboard
-    ADSGRAM_BLOCK_ID = os.getenv("ADSGRAM_BLOCK_ID", "")
-    
     # Cloud Backup Configuration (GitHub)
     CLOUD_BACKUP_SERVICE = os.getenv("CLOUD_BACKUP_SERVICE", "").lower().strip()
     GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "")
