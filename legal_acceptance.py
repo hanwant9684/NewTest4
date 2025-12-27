@@ -8,7 +8,7 @@ from telethon_helpers import InlineKeyboardButton, InlineKeyboardMarkup
 from logger import LOGGER
 
 from database_sqlite import db
-from richads import richads
+from adsgram import adsgram
 
 LEGAL_DIR = "legal"
 TERMS_FILE = os.path.join(LEGAL_DIR, "terms_and_conditions.txt")
@@ -104,7 +104,7 @@ def get_full_privacy() -> str:
     return f"🔒 **PRIVACY POLICY (FULL)**\n\n{privacy}"
 
 async def show_legal_acceptance(event, bot=None):
-    """Show legal acceptance screen to user and optionally show RichAd below"""
+    """Show legal acceptance screen to user and optionally show AdsGram ad below"""
     try:
         summary = get_legal_summary()
         
@@ -122,14 +122,14 @@ async def show_legal_acceptance(event, bot=None):
         await event.respond(summary, buttons=markup.to_telethon(), link_preview=False)
         LOGGER(__name__).info(f"Shown legal acceptance screen to user {event.sender_id}")
         
-        # Show RichAd below legal acceptance if bot client is provided
-        if bot and richads.is_enabled():
+        # Show AdsGram ad below legal acceptance if bot client is provided
+        if bot and adsgram.is_enabled():
             try:
                 sender = await event.get_sender()
                 lang_code = getattr(sender, 'lang_code', 'en') or 'en'
-                await richads.send_ad_to_user(bot, event.chat_id, lang_code)
+                await adsgram.send_ad_to_user(bot, event.chat_id, event.sender_id, lang_code)
             except Exception as ad_error:
-                LOGGER(__name__).warning(f"Failed to send RichAd after legal acceptance: {ad_error}")
+                LOGGER(__name__).warning(f"Failed to send AdsGram ad after legal acceptance: {ad_error}")
         
     except Exception as e:
         LOGGER(__name__).error(f"Error showing legal acceptance: {e}")

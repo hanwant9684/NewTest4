@@ -354,6 +354,58 @@ def application(environ, start_response):
             start_response(status, headers)
             return [body]
         
+        elif path == '/reward' and method == 'GET':
+            """Handle AdsGram reward - grant 5 free downloads to user"""
+            from database_sqlite import db
+            import json
+            
+            query_string = environ.get('QUERY_STRING', '')
+            params = parse_qs(query_string)
+            user_id_str = params.get('user_id', [''])[0].strip()
+            
+            try:
+                if not user_id_str or not user_id_str.isdigit():
+                    status = '400 Bad Request'
+                    body = json.dumps({"status": "error", "message": "Invalid user_id"}).encode('utf-8')
+                    headers = [('Content-Type', 'application/json; charset=utf-8')] + headers_common
+                    start_response(status, headers)
+                    return [body]
+                
+                user_id = int(user_id_str)
+                LOGGER(__name__).info(f"AdsGram reward request for user {user_id}")
+                
+                # Grant 5 free downloads for watching ad
+                success = db.add_ad_downloads(user_id, 5)
+                
+                if success:
+                    LOGGER(__name__).info(f"✅ Granted 5 free downloads to user {user_id} from AdsGram reward")
+                    status = '200 OK'
+                    body = json.dumps({
+                        "status": "success",
+                        "message": "5 free downloads granted!",
+                        "user_id": user_id,
+                        "downloads_granted": 5
+                    }).encode('utf-8')
+                else:
+                    LOGGER(__name__).warning(f"❌ Failed to grant downloads to user {user_id}")
+                    status = '400 Bad Request'
+                    body = json.dumps({
+                        "status": "error",
+                        "message": "Failed to grant downloads"
+                    }).encode('utf-8')
+                
+                headers = [('Content-Type', 'application/json; charset=utf-8')] + headers_common
+                start_response(status, headers)
+                return [body]
+                
+            except Exception as e:
+                LOGGER(__name__).error(f"Error processing AdsGram reward: {e}")
+                status = '500 Internal Server Error'
+                body = json.dumps({"status": "error", "message": "Server error"}).encode('utf-8')
+                headers = [('Content-Type', 'application/json; charset=utf-8')] + headers_common
+                start_response(status, headers)
+                return [body]
+        
         elif path == '/admin/login' and method == 'GET':
             html = '''<!DOCTYPE html>
 <html lang="en">
